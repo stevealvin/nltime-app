@@ -32,12 +32,13 @@ class MainActivity : FlutterActivity() {
                     val showMs = call.argument<Boolean>("showMs") ?: true
                     val showOffset = call.argument<Boolean>("showOffset") ?: true
                     val showSource = call.argument<Boolean>("showSource") ?: true
+                    val showProgress = call.argument<Boolean>("showProgress") ?: true
                     val opacity = (call.argument<Number>("opacity") ?: 0.9).toFloat()
                     val scale = (call.argument<Number>("scale") ?: 1.0).toFloat()
                     val themeIdx = (call.argument<Number>("themeIdx") ?: 0).toInt()
 
                     FloatClockService.updateParams(
-                        offset, rtt, source, showMs, showOffset, showSource, opacity, scale, themeIdx
+                        offset, rtt, source, showMs, showOffset, showSource, showProgress, opacity, scale, themeIdx
                     )
 
                     if (call.method == "startNativeFloatWindow" && !FloatClockService.isRunning) {

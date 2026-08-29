@@ -53,12 +53,13 @@ class FloatingClockManager {
             'offsetMs': AppService.serverTimeOffsetNotifier.value,
             'rttMs': AppService.rttNotifier.value,
             'source': AppService.currentTimeService.name,
-            'themeIdx': AppService.themeIndexNotifier.value,
+            'themeIdx': 0,
             'opacity': AppService.floatingOpacityNotifier.value,
             'scale': AppService.floatingScaleNotifier.value,
             'showMs': AppService.floatingShowMsNotifier.value,
             'showOffset': AppService.floatingShowOffsetNotifier.value,
             'showSource': AppService.floatingShowSourceNotifier.value,
+            'showProgress': AppService.floatingShowProgressNotifier.value,
           });
           _isSystemWindowActive = true;
         } catch (_) {}
@@ -81,12 +82,13 @@ class FloatingClockManager {
           'offsetMs': AppService.serverTimeOffsetNotifier.value,
           'rttMs': AppService.rttNotifier.value,
           'source': AppService.currentTimeService.name,
-          'themeIdx': AppService.themeIndexNotifier.value,
+          'themeIdx': 0,
           'opacity': AppService.floatingOpacityNotifier.value,
           'scale': AppService.floatingScaleNotifier.value,
           'showMs': AppService.floatingShowMsNotifier.value,
           'showOffset': AppService.floatingShowOffsetNotifier.value,
           'showSource': AppService.floatingShowSourceNotifier.value,
+          'showProgress': AppService.floatingShowProgressNotifier.value,
         });
       } catch (_) {}
     }

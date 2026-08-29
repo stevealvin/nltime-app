@@ -29,7 +29,6 @@ class AppService {
 
   static const String _prefsKeyCustomServices = 'custom_time_services';
   static const String _prefsKeyCurrentServiceId = 'current_time_service_id';
-  static const String _prefsKeyThemeIndex = 'app_theme_mode_index';
   
   // Floating window settings keys
   static const String _prefsKeyFloatingEnabled = 'floating_enabled';
@@ -38,18 +37,19 @@ class AppService {
   static const String _prefsKeyFloatingShowMs = 'floating_show_ms';
   static const String _prefsKeyFloatingShowOffset = 'floating_show_offset';
   static const String _prefsKeyFloatingShowSource = 'floating_show_source';
+  static const String _prefsKeyFloatingShowProgress = 'floating_show_progress';
 
   // ValueNotifiers for reactive UI updates
   static final ValueNotifier<String> activeServiceIdNotifier = ValueNotifier<String>('suning');
-  static final ValueNotifier<int> themeIndexNotifier = ValueNotifier<int>(0);
   
   // Floating window state Notifiers
   static final ValueNotifier<bool> floatingEnabledNotifier = ValueNotifier<bool>(false);
   static final ValueNotifier<double> floatingOpacityNotifier = ValueNotifier<double>(0.9);
-  static final ValueNotifier<double> floatingScaleNotifier = ValueNotifier<double>(1.0);
+  static final ValueNotifier<double> floatingScaleNotifier = ValueNotifier<double>(1.2);
   static final ValueNotifier<bool> floatingShowMsNotifier = ValueNotifier<bool>(false);
   static final ValueNotifier<bool> floatingShowOffsetNotifier = ValueNotifier<bool>(true);
   static final ValueNotifier<bool> floatingShowSourceNotifier = ValueNotifier<bool>(true);
+  static final ValueNotifier<bool> floatingShowProgressNotifier = ValueNotifier<bool>(true);
 
   // Time Sync state Notifiers
   static final ValueNotifier<int> serverTimeOffsetNotifier = ValueNotifier<int>(0);
@@ -118,16 +118,14 @@ class AppService {
       activeServiceIdNotifier.value = currentId;
     }
 
-    // Theme index
-    themeIndexNotifier.value = prefs.getInt(_prefsKeyThemeIndex) ?? 0;
-
     // Floating window settings
     floatingEnabledNotifier.value = prefs.getBool(_prefsKeyFloatingEnabled) ?? false;
     floatingOpacityNotifier.value = prefs.getDouble(_prefsKeyFloatingOpacity) ?? 0.9;
-    floatingScaleNotifier.value = prefs.getDouble(_prefsKeyFloatingScale) ?? 1.0;
+    floatingScaleNotifier.value = prefs.getDouble(_prefsKeyFloatingScale) ?? 1.2;
     floatingShowMsNotifier.value = prefs.getBool(_prefsKeyFloatingShowMs) ?? false;
     floatingShowOffsetNotifier.value = prefs.getBool(_prefsKeyFloatingShowOffset) ?? true;
     floatingShowSourceNotifier.value = prefs.getBool(_prefsKeyFloatingShowSource) ?? true;
+    floatingShowProgressNotifier.value = prefs.getBool(_prefsKeyFloatingShowProgress) ?? true;
 
     if (floatingEnabledNotifier.value) {
       FloatingClockManager.updateSystemOverlayState(true);
@@ -140,13 +138,6 @@ class AppService {
     await prefs.setString(_prefsKeyCurrentServiceId, id);
     // Auto sync upon switching source manually
     await syncWithSelectedService();
-  }
-
-  /// Theme switching (0: Deep OLED, 1: Cyberpunk Neon, 2: Studio Light, 3: Emerald Glow)
-  static Future<void> setThemeIndex(int index) async {
-    themeIndexNotifier.value = index;
-    await prefs.setInt(_prefsKeyThemeIndex, index);
-    await FloatingClockManager.syncOverlayData();
   }
 
   /// Floating window settings updates
@@ -183,6 +174,12 @@ class AppService {
   static Future<void> setFloatingShowSource(bool val) async {
     floatingShowSourceNotifier.value = val;
     await prefs.setBool(_prefsKeyFloatingShowSource, val);
+    await FloatingClockManager.syncOverlayData();
+  }
+
+  static Future<void> setFloatingShowProgress(bool val) async {
+    floatingShowProgressNotifier.value = val;
+    await prefs.setBool(_prefsKeyFloatingShowProgress, val);
     await FloatingClockManager.syncOverlayData();
   }
 

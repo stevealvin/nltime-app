@@ -1,9 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import '../common/app_service.dart';
-import '../common/theme_manager.dart';
-
 class LapRecord {
   final int lapIndex;
   final int lapTimeMs;
@@ -16,6 +13,7 @@ class LapRecord {
   });
 }
 
+/// Stopwatch page — pure content widget, no inner Scaffold.
 class StopwatchPage extends StatefulWidget {
   const StopwatchPage({super.key});
 
@@ -30,11 +28,16 @@ class _StopwatchPageState extends State<StopwatchPage> {
   int _lastLapTotalMs = 0;
   final List<LapRecord> _laps = [];
 
-  void _startStopwatch() {
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _start() {
     if (_isRunning) return;
     setState(() => _isRunning = true);
     final startTime = DateTime.now().millisecondsSinceEpoch - _elapsedMs;
-
     _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
       if (mounted) {
         setState(() {
@@ -44,12 +47,12 @@ class _StopwatchPageState extends State<StopwatchPage> {
     });
   }
 
-  void _pauseStopwatch() {
+  void _pause() {
     _timer?.cancel();
     setState(() => _isRunning = false);
   }
 
-  void _resetStopwatch() {
+  void _reset() {
     _timer?.cancel();
     setState(() {
       _isRunning = false;
@@ -76,234 +79,178 @@ class _StopwatchPageState extends State<StopwatchPage> {
   }
 
   String _formatMs(int ms) {
-    final duration = Duration(milliseconds: ms);
-    final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    final millis = (duration.inMilliseconds % 1000).toString().padLeft(3, '0');
-    return '$hours:$minutes:$seconds.$millis';
+    final d = Duration(milliseconds: ms);
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    final ms3 = (d.inMilliseconds % 1000).toString().padLeft(3, '0');
+    return '$h:$m:$s.$ms3';
   }
 
   String _formatLapMs(int ms) {
-    final duration = Duration(milliseconds: ms);
-    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    final millis = (duration.inMilliseconds % 1000).toString().padLeft(3, '0');
-    return '$minutes:$seconds.$millis';
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+    final d = Duration(milliseconds: ms);
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    final ms3 = (d.inMilliseconds % 1000).toString().padLeft(3, '0');
+    return '$m:$s.$ms3';
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: AppService.themeIndexNotifier,
-      builder: (context, themeIndex, _) {
-        final theme = ThemeManager.getTheme(themeIndex);
-
-        return Scaffold(
-          backgroundColor: theme.bgColor,
-          appBar: AppBar(
-            backgroundColor: theme.bgColor,
-            elevation: 0,
-            title: Row(
-              children: [
-                Icon(Icons.timer_outlined, color: theme.primaryColor, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  '高精度毫秒秒表',
-                  style: TextStyle(
-                    color: theme.textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          body: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              children: [
-                _buildDisplayCard(theme),
-                const SizedBox(height: 20),
-                _buildControlButtons(theme),
-                const SizedBox(height: 20),
-                Expanded(child: _buildLapsList(theme)),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDisplayCard(AppThemeData theme) {
-    final duration = Duration(milliseconds: _elapsedMs);
-    final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    final millis = (duration.inMilliseconds % 1000).toString().padLeft(3, '0');
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.dividerColor),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withValues(alpha: 0.06),
-            blurRadius: 20,
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  '$hours:$minutes:$seconds',
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'monospace',
-                    color: theme.textColor,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Text(
-                  '.',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    color: theme.primaryColor,
-                  ),
-                ),
-                Text(
-                  millis,
-                  style: TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    color: theme.primaryColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildDisplayCard(context),
+          const SizedBox(height: 20),
+          _buildControlButtons(context),
+          const SizedBox(height: 20),
+          Expanded(child: _buildLapsList(context)),
         ],
       ),
     );
   }
 
-  Widget _buildControlButtons(AppThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // Lap / Reset Button
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.cardColor,
-            foregroundColor: theme.textColor,
-            minimumSize: const Size(100, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: theme.dividerColor),
-            ),
-          ),
-          onPressed: _isRunning ? _addLap : _resetStopwatch,
+  Widget _buildDisplayCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final d = Duration(milliseconds: _elapsedMs);
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    final ms = (d.inMilliseconds % 1000).toString().padLeft(3, '0');
+
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Theme.of(context).dividerColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Icon(_isRunning ? Icons.flag_rounded : Icons.rotate_left_rounded, size: 18),
-              const SizedBox(width: 6),
-              Text(_isRunning ? '计圈' : '重置'),
+              Text(
+                '$h:$m:$s',
+                style: TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'monospace',
+                  color: cs.onSurface,
+                  letterSpacing: 2,
+                ),
+              ),
+              Text(
+                '.',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  color: cs.primary,
+                ),
+              ),
+              Text(
+                ms,
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  color: cs.primary,
+                ),
+              ),
             ],
           ),
         ),
-        // Start / Pause Button
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _isRunning ? Colors.amber[700] : theme.primaryColor,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(140, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+      ),
+    );
+  }
+
+  Widget _buildControlButtons(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(110, 52),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            side: BorderSide(color: Theme.of(context).dividerColor),
+          ),
+          onPressed: _isRunning ? _addLap : _reset,
+          icon: Icon(_isRunning ? Icons.flag_rounded : Icons.rotate_left_rounded,
+              size: 18),
+          label: Text(_isRunning ? '计圈' : '重置'),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(150, 52),
+            backgroundColor: _isRunning ? Colors.amber[700] : cs.primary,
+            foregroundColor: _isRunning ? Colors.white : cs.onPrimary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 4,
           ),
-          onPressed: _isRunning ? _pauseStopwatch : _startStopwatch,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _isRunning ? '暂停' : '开始计时',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ],
+          onPressed: _isRunning ? _pause : _start,
+          icon: Icon(_isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              size: 20),
+          label: Text(
+            _isRunning ? '暂停' : '开始计时',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLapsList(AppThemeData theme) {
+  Widget _buildLapsList(BuildContext context) {
     if (_laps.isEmpty) {
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.format_list_numbered_rounded, size: 40, color: theme.subTextColor.withValues(alpha: 0.5)),
+            Icon(
+              Icons.format_list_numbered_rounded,
+              size: 40,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 10),
             Text(
-              '点击“计圈”添加分段记录',
-              style: TextStyle(color: theme.subTextColor, fontSize: 13),
+              '点击"计圈"添加分段记录',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
             ),
           ],
         ),
       );
     }
 
-    // Find fastest & slowest laps if > 1 lap
-    int? minLap;
-    int? maxLap;
+    int? minLap, maxLap;
     if (_laps.length > 1) {
-      final lapTimes = _laps.map((e) => e.lapTimeMs).toList();
-      minLap = lapTimes.reduce((a, b) => a < b ? a : b);
-      maxLap = lapTimes.reduce((a, b) => a > b ? a : b);
+      final times = _laps.map((e) => e.lapTimeMs).toList();
+      minLap = times.reduce((a, b) => a < b ? a : b);
+      maxLap = times.reduce((a, b) => a > b ? a : b);
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
+    return Card(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor),
+        side: BorderSide(color: Theme.of(context).dividerColor),
       ),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         itemCount: _laps.length,
-        separatorBuilder: (_, __) => Divider(color: theme.dividerColor, height: 1),
+        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final lap = _laps[index];
           final isFastest = minLap != null && lap.lapTimeMs == minLap;
           final isSlowest = maxLap != null && lap.lapTimeMs == maxLap;
-
-          Color itemColor = theme.textColor;
-          if (isFastest) itemColor = Colors.greenAccent;
-          if (isSlowest) itemColor = Colors.redAccent;
+          final lapColor = isFastest
+              ? Colors.greenAccent
+              : isSlowest
+                  ? Colors.redAccent
+                  : Theme.of(context).colorScheme.onSurface;
 
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -315,39 +262,28 @@ class _StopwatchPageState extends State<StopwatchPage> {
                     Text(
                       '计圈 ${lap.lapIndex.toString().padLeft(2, '0')}',
                       style: TextStyle(
-                        color: theme.subTextColor,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
                     ),
                     if (isFastest) ...[
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('最快', style: TextStyle(color: Colors.greenAccent, fontSize: 10)),
-                      ),
+                      _LapBadge(label: '最快', color: Colors.green),
                     ],
                     if (isSlowest) ...[
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('最慢', style: TextStyle(color: Colors.redAccent, fontSize: 10)),
-                      ),
+                      _LapBadge(label: '最慢', color: Colors.red),
                     ],
                   ],
                 ),
                 Text(
                   '+${_formatLapMs(lap.lapTimeMs)}',
                   style: TextStyle(
-                    color: itemColor,
+                    color: lapColor,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -356,7 +292,10 @@ class _StopwatchPageState extends State<StopwatchPage> {
                 Text(
                   _formatMs(lap.totalTimeMs),
                   style: TextStyle(
-                    color: theme.subTextColor,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.55),
                     fontFamily: 'monospace',
                     fontSize: 13,
                   ),
@@ -365,6 +304,27 @@ class _StopwatchPageState extends State<StopwatchPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _LapBadge extends StatelessWidget {
+  final String label;
+  final MaterialColor color;
+  const _LapBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color.shade300, fontSize: 10),
       ),
     );
   }

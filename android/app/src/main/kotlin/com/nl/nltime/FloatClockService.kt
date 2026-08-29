@@ -19,6 +19,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
@@ -42,6 +43,12 @@ class FloatClockService : Service() {
     private var minBtn: TextView? = null
     private var expandBtn: TextView? = null
     private var closeBtn: TextView? = null
+
+    // Millisecond Progress Bar Views & 0-10 Scale
+    private var progressTrackLayout: FrameLayout? = null
+    private var progressFillView: View? = null
+    private var scaleLayout: LinearLayout? = null
+    private val scaleTextViews = mutableListOf<TextView>()
     
     private var handler: Handler? = null
     private var runnable: Runnable? = null
@@ -57,8 +64,9 @@ class FloatClockService : Service() {
         var showMs: Boolean = true
         var showOffset: Boolean = true
         var showSource: Boolean = true
-        var opacity: Float = 0.9f
-        var scale: Float = 1.0f
+        var showProgress: Boolean = true
+        var opacity: Float = 0.95f
+        var scale: Float = 1.2f
         var themeIdx: Int = 0
 
         const val CHANNEL_ID = "nltime_float_channel"
@@ -71,6 +79,7 @@ class FloatClockService : Service() {
             showMsVal: Boolean,
             showOffsetVal: Boolean,
             showSourceVal: Boolean,
+            showProgressVal: Boolean,
             opacityVal: Float,
             scaleVal: Float,
             themeIndex: Int
@@ -81,6 +90,7 @@ class FloatClockService : Service() {
             showMs = showMsVal
             showOffset = showOffsetVal
             showSource = showSourceVal
+            showProgress = showProgressVal
             opacity = opacityVal
             scale = scaleVal
             themeIdx = themeIndex
@@ -126,32 +136,13 @@ class FloatClockService : Service() {
     }
 
     private fun getThemeColors(): ThemeColors {
-        return when (themeIdx) {
-            1 -> ThemeColors(
-                cardColor = "#EE1B1633",
-                primaryColor = "#FF2A85",
-                textColor = "#FFFFFF",
-                subTextColor = "#A78BFA"
-            )
-            2 -> ThemeColors(
-                cardColor = "#EEFFFFFF",
-                primaryColor = "#4F46E5",
-                textColor = "#0F172A",
-                subTextColor = "#64748B"
-            )
-            3 -> ThemeColors(
-                cardColor = "#EE102820",
-                primaryColor = "#00E676",
-                textColor = "#FFFFFF",
-                subTextColor = "#6EE7B7"
-            )
-            else -> ThemeColors(
-                cardColor = "#EE131A2A",
-                primaryColor = "#00E5FF",
-                textColor = "#FFFFFF",
-                subTextColor = "#94A3B8"
-            )
-        }
+        // Modern clean translucent white card palette matching the app
+        return ThemeColors(
+            cardColor = "#F8FFFFFF",
+            primaryColor = "#4F46E5",
+            textColor = "#0F172A",
+            subTextColor = "#64748B"
+        )
     }
 
     data class ThemeColors(
@@ -202,8 +193,8 @@ class FloatClockService : Service() {
         }
 
         dotView = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp2px(8), dp2px(8)).apply {
-                rightMargin = dp2px(6)
+            layoutParams = LinearLayout.LayoutParams(dp2px(9), dp2px(9)).apply {
+                rightMargin = dp2px(7)
             }
         }
 
@@ -224,7 +215,7 @@ class FloatClockService : Service() {
 
         closeBtn = TextView(this).apply {
             text = " ✕ "
-            setTextColor(Color.parseColor("#FF5252"))
+            setTextColor(Color.parseColor("#EF4444"))
             typeface = Typeface.DEFAULT_BOLD
             setOnClickListener {
                 stopSelf()
@@ -237,7 +228,7 @@ class FloatClockService : Service() {
         headerLayout.addView(closeBtn)
         fullLayout?.addView(headerLayout)
 
-        // Full Time TextView
+        // Full Time TextView (Large bold digital clock)
         fullTimeTv = TextView(this).apply {
             typeface = Typeface.MONOSPACE
             setTypeface(typeface, Typeface.BOLD)
@@ -259,6 +250,52 @@ class FloatClockService : Service() {
         subInfoRow.addView(sourceBadgeTv)
         subInfoRow.addView(subTextView)
         fullLayout?.addView(subInfoRow)
+
+        // --- BOTTOM MILLISECOND PROGRESS BAR ---
+        progressTrackLayout = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp2px(4)
+            ).apply {
+                topMargin = dp2px(6)
+            }
+        }
+
+        progressFillView = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            pivotX = 0f
+        }
+
+        progressTrackLayout?.addView(progressFillView)
+        fullLayout?.addView(progressTrackLayout)
+
+        // --- 0 to 10 SCALE ROW ---
+        scaleLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp2px(2)
+            }
+        }
+
+        scaleTextViews.clear()
+        for (i in 0..10) {
+            val tv = TextView(this).apply {
+                text = "$i"
+                textSize = 7.5f
+                gravity = if (i == 0) Gravity.START else if (i == 10) Gravity.END else Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                typeface = Typeface.MONOSPACE
+            }
+            scaleTextViews.add(tv)
+            scaleLayout?.addView(tv)
+        }
+        fullLayout?.addView(scaleLayout)
 
         // --- MINI CONTENT LAYOUT ---
         miniLayout = LinearLayout(this).apply {
@@ -324,7 +361,7 @@ class FloatClockService : Service() {
 
         windowManager?.addView(containerView, params)
 
-        // Handler timer for 16ms high frequency millisecond update
+        // Handler timer for 16ms (~60 FPS) high frequency millisecond update
         handler = Handler(Looper.getMainLooper())
         val dateFormatSec = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
@@ -334,12 +371,13 @@ class FloatClockService : Service() {
                 val date = Date(nowMs)
 
                 val secStr = dateFormatSec.format(date)
+                val msValue = (nowMs % 1000).toInt()
                 val msVal = if (showMs) {
                     // Show full 3-digit milliseconds (.SSS) when switch is ON
-                    String.format(Locale.getDefault(), ".%03d", (nowMs % 1000).toInt())
+                    String.format(Locale.getDefault(), ".%03d", msValue)
                 } else {
                     // Default: 1-digit millisecond (.S)
-                    val msDigit = ((nowMs % 1000) / 100).toInt()
+                    val msDigit = (msValue / 100)
                     ".$msDigit"
                 }
 
@@ -355,7 +393,7 @@ class FloatClockService : Service() {
                     secStr.length,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
-                // Milliseconds (.S or .SSS) in vibrant primaryThemeColor and 0.75x font size
+                // Milliseconds (.S or .SSS) in vibrant primaryThemeColor and 0.78x font size
                 spannable.setSpan(
                     ForegroundColorSpan(primaryThemeColor),
                     secStr.length,
@@ -363,7 +401,7 @@ class FloatClockService : Service() {
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 spannable.setSpan(
-                    RelativeSizeSpan(0.75f),
+                    RelativeSizeSpan(0.78f),
                     secStr.length,
                     spannable.length,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -378,6 +416,12 @@ class FloatClockService : Service() {
                 val offsetSec = timeOffsetMs / 1000.0
                 subTextView?.text = String.format(Locale.getDefault(), "偏差: %.2fs | RTT: %dms", offsetSec, rttMs)
                 subTextView?.visibility = if (showOffset) View.VISIBLE else View.GONE
+
+                // Update bottom millisecond progress bar (0 ~ 1000ms)
+                if (showProgress) {
+                    val progressRatio = msValue / 1000f
+                    progressFillView?.scaleX = progressRatio
+                }
 
                 containerView?.alpha = opacity
 
@@ -404,18 +448,19 @@ class FloatClockService : Service() {
         val textColor = Color.parseColor(colors.textColor)
         val subTextColor = Color.parseColor(colors.subTextColor)
 
-        val s = scale.coerceIn(0.5f, 2.5f)
+        val s = scale.coerceIn(0.6f, 3.0f)
 
         // Real-time padding update
-        val pad = dp2px((10 * s).toInt().coerceAtLeast(6))
-        containerView?.setPadding(pad, pad, pad, pad)
+        val padH = dp2px((14 * s).toInt().coerceAtLeast(8))
+        val padV = dp2px((12 * s).toInt().coerceAtLeast(7))
+        containerView?.setPadding(padH, padV, padH, padV)
         containerView?.alpha = opacity
 
-        // Card Background
+        // Card Background with smooth rounded corners and crisp border
         val bg = GradientDrawable().apply {
             setColor(cardBgColor)
-            cornerRadius = dp2px((16 * s).toInt().coerceAtLeast(8)).toFloat()
-            setStroke(dp2px(1.5f * s), primaryColor)
+            cornerRadius = dp2px((18 * s).toInt().coerceAtLeast(10)).toFloat()
+            setStroke(dp2px(1.5f * s), Color.parseColor("#CBD5E1"))
         }
         containerView?.background = bg
 
@@ -425,64 +470,102 @@ class FloatClockService : Service() {
             shape = GradientDrawable.OVAL
         }
         dotView?.background = dotBg
+        (dotView?.layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
+            lp.width = dp2px(9 * s)
+            lp.height = dp2px(9 * s)
+            lp.rightMargin = dp2px(7 * s)
+            dotView?.layoutParams = lp
+        }
 
-        // Text Colors & Real-Time Font Sizes
+        // Text Colors & Real-Time Font Sizes (Enlarged)
         titleTv?.apply {
             setTextColor(subTextColor)
-            textSize = 11f * s
+            textSize = 12f * s
         }
 
         minBtn?.apply {
             setTextColor(subTextColor)
-            textSize = 13f * s
+            textSize = 14f * s
         }
 
         expandBtn?.apply {
             setTextColor(subTextColor)
-            textSize = 13f * s
+            textSize = 14f * s
         }
 
         fullTimeTv?.apply {
             setTextColor(textColor)
-            textSize = 22f * s
-            setPadding(0, dp2px(4 * s), 0, dp2px(2 * s))
+            textSize = 28f * s
+            setPadding(0, dp2px(6 * s), 0, dp2px(4 * s))
         }
 
         miniTimeTv?.apply {
             setTextColor(textColor)
-            textSize = 14f * s
-            setPadding(dp2px(4 * s), 0, dp2px(8 * s), 0)
+            textSize = 16f * s
+            setPadding(dp2px(5 * s), 0, dp2px(10 * s), 0)
         }
 
         miniIconTv?.apply {
             setTextColor(primaryColor)
-            textSize = 13f * s
+            textSize = 14f * s
         }
 
         subTextView?.apply {
             setTextColor(subTextColor)
-            textSize = 9f * s
-            setPadding(dp2px(6 * s), 0, 0, 0)
+            textSize = 10.5f * s
+            setPadding(dp2px(7 * s), 0, 0, 0)
         }
 
         // Source Badge Background, Padding & Color
         val badgeBg = GradientDrawable().apply {
             val alphaPrimary = Color.argb(
-                40,
+                35,
                 Color.red(primaryColor),
                 Color.green(primaryColor),
                 Color.blue(primaryColor)
             )
             setColor(alphaPrimary)
-            cornerRadius = dp2px((4 * s).toInt().coerceAtLeast(2)).toFloat()
+            cornerRadius = dp2px((5 * s).toInt().coerceAtLeast(3)).toFloat()
         }
         sourceBadgeTv?.apply {
             background = badgeBg
             setTextColor(primaryColor)
-            textSize = 9f * s
-            val padH = dp2px(4 * s)
-            val padV = dp2px(2 * s)
-            setPadding(padH, padV, padH, padV)
+            textSize = 10.5f * s
+            val bPadH = dp2px(5 * s)
+            val bPadV = dp2px(2.5f * s)
+            setPadding(bPadH, bPadV, bPadH, bPadV)
+        }
+
+        // Progress Bar Track & Fill
+        val trackBg = GradientDrawable().apply {
+            setColor(Color.parseColor("#E2E8F0"))
+            cornerRadius = dp2px(2.5f * s).toFloat()
+        }
+        progressTrackLayout?.apply {
+            background = trackBg
+            visibility = if (showProgress) View.VISIBLE else View.GONE
+            (layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
+                lp.height = dp2px((4.5f * s).coerceAtLeast(3f))
+                lp.topMargin = dp2px(8 * s)
+                layoutParams = lp
+            }
+        }
+
+        val fillBg = GradientDrawable().apply {
+            setColor(primaryColor)
+            cornerRadius = dp2px(2.5f * s).toFloat()
+        }
+        progressFillView?.background = fillBg
+
+        // 0-10 Scale Row
+        scaleLayout?.apply {
+            visibility = if (showProgress) View.VISIBLE else View.GONE
+            (layoutParams as? LinearLayout.LayoutParams)?.topMargin = dp2px(2 * s)
+        }
+        scaleTextViews.forEachIndexed { i, tv ->
+            tv.textSize = 7.5f * s
+            tv.setTextColor(if (i == 0 || i == 5 || i == 10) textColor else subTextColor)
+            tv.setTypeface(tv.typeface, if (i == 0 || i == 5 || i == 10) Typeface.BOLD else Typeface.NORMAL)
         }
     }
 

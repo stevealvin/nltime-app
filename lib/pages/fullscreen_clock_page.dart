@@ -40,7 +40,7 @@ class _FullscreenClockPageState extends State<FullscreenClockPage> {
   Future<void> _handleRefresh() async {
     final result = await AppService.syncWithSelectedService();
     if (mounted) {
-      final theme = ThemeManager.getTheme(AppService.themeIndexNotifier.value);
+      final theme = ThemeManager.lightTheme;
       AppDialog.showToast(
         context: context,
         theme: theme,
@@ -54,12 +54,13 @@ class _FullscreenClockPageState extends State<FullscreenClockPage> {
 
   @override
   Widget build(BuildContext context) {
-    final themeIdx = AppService.themeIndexNotifier.value;
-    final theme = ThemeManager.getTheme(themeIdx);
+    const theme = ThemeManager.lightTheme;
 
     final timeStr = DateFormat('HH:mm:ss').format(_now);
     final msStr = (_now.millisecond).toString().padLeft(3, '0');
-    final dateStr = DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN').format(_now);
+    const weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+    final weekdayStr = weekdays[(_now.weekday - 1).clamp(0, 6)];
+    final dateStr = '${_now.year}年${_now.month.toString().padLeft(2, '0')}月${_now.day.toString().padLeft(2, '0')}日 $weekdayStr';
     final offset = AppService.serverTimeOffsetNotifier.value;
     final rtt = AppService.rttNotifier.value;
     final progress = _now.millisecond / 1000.0;
@@ -170,7 +171,7 @@ class _FullscreenClockPageState extends State<FullscreenClockPage> {
                                               ),
                                             ),
                                             Text(
-                                              '${msStr} ms / 1000 ms',
+                                              '$msStr ms / 1000 ms',
                                               style: TextStyle(
                                                 color: theme.primaryColor,
                                                 fontWeight: FontWeight.bold,
@@ -215,6 +216,46 @@ class _FullscreenClockPageState extends State<FullscreenClockPage> {
                                           ],
                                         );
                                       },
+                                    ),
+                                    const SizedBox(height: 6),
+                                    // Scale ticks & numbers (0 - 10)
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: List.generate(11, (i) {
+                                        final isMajor = i == 0 || i == 5 || i == 10;
+                                        return Container(
+                                          width: isMajor ? 2 : 1,
+                                          height: isMajor ? 6 : 4,
+                                          decoration: BoxDecoration(
+                                            color: isMajor
+                                                ? theme.subTextColor.withValues(alpha: 0.6)
+                                                : theme.subTextColor.withValues(alpha: 0.25),
+                                            borderRadius: BorderRadius.circular(1),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: List.generate(11, (i) {
+                                        final isMajor = i == 0 || i == 5 || i == 10;
+                                        return SizedBox(
+                                          width: 14,
+                                          child: Text(
+                                            '$i',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: isMajor
+                                                  ? theme.subTextColor.withValues(alpha: 0.8)
+                                                  : theme.subTextColor.withValues(alpha: 0.4),
+                                              fontSize: 10,
+                                              fontWeight: isMajor ? FontWeight.bold : FontWeight.normal,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
+                                        );
+                                      }),
                                     ),
                                   ],
                                 ),

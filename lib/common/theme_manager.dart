@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Legacy per-field palette kept for FullscreenClockPage & FloatingClockService
+/// which render outside the normal Theme tree.
 class AppThemeData {
   final String name;
   final Brightness brightness;
@@ -22,58 +24,126 @@ class AppThemeData {
     required this.subTextColor,
     required this.dividerColor,
   });
+
+  /// Generate a full Material 3 ThemeData from this palette.
+  ThemeData get themeData {
+    final cs = ColorScheme.fromSeed(
+      seedColor: primaryColor,
+      brightness: brightness,
+      surface: bgColor,
+    ).copyWith(
+      primary: primaryColor,
+      secondary: accentColor,
+      onSurface: textColor,
+      surfaceContainerHighest: cardColor,
+      outline: dividerColor,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: cs,
+      scaffoldBackgroundColor: bgColor,
+      cardColor: cardColor,
+      dividerColor: dividerColor,
+      appBarTheme: AppBarTheme(
+        backgroundColor: bgColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: IconThemeData(color: textColor),
+        titleTextStyle: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: cardColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        indicatorColor: primaryColor.withValues(alpha: 0.18),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: primaryColor);
+          }
+          return IconThemeData(color: subTextColor);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return TextStyle(
+              color: primaryColor,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            );
+          }
+          return TextStyle(color: subTextColor, fontSize: 11);
+        }),
+      ),
+      cardTheme: CardThemeData(
+        color: cardColor,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: dividerColor),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return primaryColor;
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return primaryColor.withValues(alpha: 0.4);
+          }
+          return null;
+        }),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: primaryColor,
+        thumbColor: primaryColor,
+        inactiveTrackColor: primaryColor.withValues(alpha: 0.2),
+        overlayColor: primaryColor.withValues(alpha: 0.12),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: brightness == Brightness.dark ? Colors.black : Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: cardColor,
+        contentTextStyle: TextStyle(color: textColor),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      dividerTheme: DividerThemeData(color: dividerColor, space: 1, thickness: 1),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return primaryColor;
+          return subTextColor;
+        }),
+      ),
+    );
+  }
 }
 
 class ThemeManager {
-  static const List<AppThemeData> themes = [
-    AppThemeData(
-      name: 'OLED 深邃暗黑',
-      brightness: Brightness.dark,
-      bgColor: Color(0xFF090D16),
-      cardColor: Color(0xFF131A2A),
-      primaryColor: Color(0xFF00E5FF),
-      accentColor: Color(0xFF7C4DFF),
-      textColor: Colors.white,
-      subTextColor: Color(0xFF94A3B8),
-      dividerColor: Color(0xFF1E293B),
-    ),
-    AppThemeData(
-      name: '赛博霓虹',
-      brightness: Brightness.dark,
-      bgColor: Color(0xFF0D0B18),
-      cardColor: Color(0xFF1B1633),
-      primaryColor: Color(0xFFFF2A85),
-      accentColor: Color(0xFF00F5D4),
-      textColor: Colors.white,
-      subTextColor: Color(0xFFA78BFA),
-      dividerColor: Color(0xFF2E2454),
-    ),
-    AppThemeData(
-      name: '极简工作室 (浅色)',
-      brightness: Brightness.light,
-      bgColor: Color(0xFFF8FAFC),
-      cardColor: Colors.white,
-      primaryColor: Color(0xFF4F46E5),
-      accentColor: Color(0xFF0EA5E9),
-      textColor: Color(0xFF0F172A),
-      subTextColor: Color(0xFF64748B),
-      dividerColor: Color(0xFFE2E8F0),
-    ),
-    AppThemeData(
-      name: '翡翠科技',
-      brightness: Brightness.dark,
-      bgColor: Color(0xFF081410),
-      cardColor: Color(0xFF102820),
-      primaryColor: Color(0xFF00E676),
-      accentColor: Color(0xFF1DE9B6),
-      textColor: Colors.white,
-      subTextColor: Color(0xFF6EE7B7),
-      dividerColor: Color(0xFF1B382D),
-    ),
-  ];
+  static const AppThemeData lightTheme = AppThemeData(
+    name: '极简白',
+    brightness: Brightness.light,
+    bgColor: Color(0xFFF8FAFC),
+    cardColor: Colors.white,
+    primaryColor: Color(0xFF4F46E5),
+    accentColor: Color(0xFF0EA5E9),
+    textColor: Color(0xFF0F172A),
+    subTextColor: Color(0xFF64748B),
+    dividerColor: Color(0xFFE2E8F0),
+  );
 
-  static AppThemeData getTheme(int index) {
-    if (index < 0 || index >= themes.length) return themes[0];
-    return themes[index];
-  }
+  /// Single active theme — always light.
+  static AppThemeData getTheme([int index = 0]) => lightTheme;
 }
