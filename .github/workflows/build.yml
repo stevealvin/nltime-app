@@ -11,6 +11,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check environment
+        run: |
+          flutter --version
+          java -version
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
       - name: Build Android
         uses: AcmeSoftwareLLC/flutter-build@v2
         with:
