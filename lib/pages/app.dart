@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../common/app_service.dart';
+import '../coupon/coupon_page.dart';
 import 'floating_page.dart';
 import 'home.dart';
 import 'settings.dart';
@@ -36,17 +37,23 @@ class _AppPageState extends State<AppPage> {
       label: '毫秒秒表',
     ),
     NavigationDestination(
+      icon: Icon(Icons.confirmation_num_outlined),
+      selectedIcon: Icon(Icons.confirmation_num_rounded),
+      label: '领券',
+    ),
+    NavigationDestination(
       icon: Icon(Icons.settings_outlined),
       selectedIcon: Icon(Icons.settings_rounded),
       label: '设置',
     ),
   ];
 
-  static const _titles = ['极速对时', '悬浮窗时钟', '毫秒秒表', '设置中心'];
+  static const _titles = ['极速对时', '悬浮窗时钟', '毫秒秒表', '美团领券', '设置中心'];
   static const _icons = [
     Icons.schedule_rounded,
     Icons.layers_rounded,
     Icons.timer_rounded,
+    Icons.confirmation_num_rounded,
     Icons.settings_rounded,
   ];
 
@@ -55,6 +62,7 @@ class _AppPageState extends State<AppPage> {
     HomePage(),
     FloatingPage(),
     StopwatchPage(),
+    CouponPage(),
     SettingsPage(),
   ];
 
