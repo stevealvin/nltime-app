@@ -1,6 +1,15 @@
-steps:
-  - name: Build Android bundle
-    uses: AcmeSoftwareLLC/flutter-build@v2
-    with:
-      flutter-version: "3.47.2"
-      script: flutter build apk --release
+name: Build Android
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build Android bundle
+        uses: AcmeSoftwareLLC/flutter-build@v2
+        with:
+          flutter-version: "3.47.2"
+          script: flutter build apk --release
