@@ -1,13 +1,21 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart' show DateFormat;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../common/app_service.dart';
+import '../common/floating_clock_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/glass_container.dart';
 import '../views/app_dialog.dart';
-import 'app.dart';
 
-/// Home page — pure content widget. No Scaffold, no AppBar.
-/// Mounted inside AppPage's IndexedStack which provides the single root Scaffold.
+abstract class HomePageController {
+  static VoidCallback? triggerSync;
+}
+
+/// 极速对时与悬浮窗主页面 (Time Sync & Integrated Floating Settings)
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -15,19 +23,22 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late Timer _timer;
   DateTime _currentTime = DateTime.now();
   bool _isSyncing = false;
+  bool _isSystemPermissionGranted = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
-    // Register the sync callback so AppPage's AppBar button can trigger it
     HomePageController.triggerSync = _triggerSync;
 
-    // High-precision 10ms tick for smooth millisecond display
+    _checkPermission();
+
+    // 10ms 高刷定时器以平滑渲染毫秒
     _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
       final offset = AppService.serverTimeOffsetNotifier.value;
       if (mounted) {
@@ -43,8 +54,19 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _timer.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     HomePageController.triggerSync = null;
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    final granted = await FloatingClockManager.isPermissionGranted();
+    if (mounted) setState(() => _isSystemPermissionGranted = granted);
   }
 
   Future<void> _triggerSync() async {
@@ -57,362 +79,523 @@ class _HomePageState extends State<HomePage> {
     AppService.isSyncingNotifier.value = false;
     if (mounted) {
       setState(() => _isSyncing = false);
-      AppDialog.showToast(
-        context: context,
-        theme: null,
-        isError: !res.success,
-        message: res.success
-            ? '已与 [${res.serviceName}] 完成精准同步 (RTT: ${res.rttMs}ms)'
-            : '同步失败: ${res.errorMessage ?? "网络连接超时"}',
-      );
+      if (res.success) {
+        AppDialog.showToast(
+          context: context,
+          message: '已对齐 ${res.serviceName}：延迟 ${res.rttMs}ms，误差 ${res.offsetMs}ms',
+        );
+      } else {
+        AppDialog.showToast(
+          context: context,
+          message: '同步失败: ${res.errorMessage}',
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _triggerSync,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      children: [
+        // 1. 核心高精度时钟看板
+        _buildClockHeroCard(context, isDark),
+        const SizedBox(height: 12),
+
+        // 2. 压缩紧凑的延迟 (RTT) 与 误差 (Offset) 状态指示条
+        _buildCompressedMetricsCard(context, isDark),
+        const SizedBox(height: 16),
+
+        // 3. 悬浮窗时钟设置专区 (整合)
+        _buildFloatingClockSettingsCard(context, isDark),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  /// 1. 极简时钟主卡片
+  Widget _buildClockHeroCard(BuildContext context, bool isDark) {
+    final timeStr = DateFormat('HH:mm:ss').format(_currentTime);
+    final msStr = (_currentTime.millisecond).toString().padLeft(3, '0');
+    final dateStr = DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN').format(_currentTime);
+
+    return GlassContainer(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      borderRadius: 24,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _TimeDisplayCard(currentTime: _currentTime),
-          const SizedBox(height: 16),
-          const _MetricsRow(),
-          const SizedBox(height: 16),
-          _MsProgressCard(currentTime: _currentTime),
-          const SizedBox(height: 8),
+          // 日期与星期
+          Text(
+            dateStr,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 主时钟数字 + 毫秒
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                timeStr,
+                style: TextStyle(
+                  fontSize: 46,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '.$msStr',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: AppColors.primary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // 毫秒进度条与 0~10 刻度尺 (对应 0~1000ms)
+          _buildMillisecondScale(context, isDark, _currentTime.millisecond),
         ],
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────
-// Sub-widgets
-// ─────────────────────────────────────────────
+  /// 毫秒动态进度条与刻度尺 (从左至右 0~1000ms 平滑扫描)
+  Widget _buildMillisecondScale(BuildContext context, bool isDark, int millisecond) {
+    final progress = (millisecond / 1000.0).clamp(0.0, 1.0);
 
-class _TimeDisplayCard extends StatelessWidget {
-  final DateTime currentTime;
-  const _TimeDisplayCard({required this.currentTime});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final timeStr = DateFormat('HH:mm:ss').format(currentTime);
-    final msStr = currentTime.millisecond.toString().padLeft(3, '0');
-    const weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
-    final weekdayStr = weekdays[(currentTime.weekday - 1).clamp(0, 6)];
-    final dateStr = '${currentTime.year}年${currentTime.month.toString().padLeft(2, '0')}月${currentTime.day.toString().padLeft(2, '0')}日 $weekdayStr';
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-        child: Column(
-          children: [
-            // Date badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                dateStr,
-                style: TextStyle(
-                  color: cs.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Large digital clock
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 动态进度条轨道 (严格从左侧 0 起点向右推进)
+        Container(
+          height: 7,
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Stack(
+                alignment: Alignment.centerLeft,
                 children: [
-                  Text(
-                    timeStr,
-                    style: TextStyle(
-                      fontSize: 54,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'monospace',
-                      color: cs.onSurface,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  Text(
-                    '.',
-                    style: TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
-                      color: cs.primary,
-                    ),
-                  ),
-                  Text(
-                    msStr,
-                    style: TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
-                      color: cs.primary,
+                  // 填充条 (从左边缘 0 开始向右伸展)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: constraints.maxWidth * progress,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            AppColors.accentIndigo,
+                            AppColors.primary,
+                            Color(0xFF10B981),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                            blurRadius: 5,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Last sync time
-            ValueListenableBuilder<DateTime?>(
-              valueListenable: AppService.lastSyncTimeNotifier,
-              builder: (context, lastSync, _) {
-                final label = lastSync != null
-                    ? '上次授时同步: ${DateFormat('HH:mm:ss').format(lastSync)}'
-                    : '尚未同步 · 下拉刷新立即校时';
-                return Text(
-                  label,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.5),
-                  ),
-                );
-              },
-            ),
-          ],
+              );
+            },
+          ),
         ),
-      ),
+        const SizedBox(height: 5),
+
+        // 0 ~ 10 刻度线与时间标识
+        SizedBox(
+          height: 18,
+          child: CustomPaint(
+            size: const Size(double.infinity, 18),
+            painter: _MillisecondTickPainter(
+              isDark: isDark,
+              currentProgress: progress,
+            ),
+          ),
+        ),
+      ],
     );
   }
-}
 
-class _MetricsRow extends StatelessWidget {
-  const _MetricsRow();
+  /// 2. 压缩优化的延迟 (RTT) 与 误差 (Offset) 紧凑指示条
+  Widget _buildCompressedMetricsCard(BuildContext context, bool isDark) {
+    return ValueListenableBuilder<int>(
+      valueListenable: AppService.rttNotifier,
+      builder: (context, rtt, _) {
+        return ValueListenableBuilder<int>(
+          valueListenable: AppService.serverTimeOffsetNotifier,
+          builder: (context, offset, _) {
+            final currentSvc = AppService.currentTimeService;
 
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        AppService.serverTimeOffsetNotifier,
-        AppService.rttNotifier,
-      ]),
-      builder: (context, _) {
-        final rtt = AppService.rttNotifier.value;
-        final offset = AppService.serverTimeOffsetNotifier.value;
-        final offsetSec = (offset / 1000).toStringAsFixed(3);
-        final rttColor = rtt < 80 ? Colors.green : Colors.amber;
+            final rttColor = rtt <= 40
+                ? AppColors.success
+                : (rtt <= 100 ? AppColors.warning : AppColors.danger);
 
-        return Row(
-          children: [
-            Expanded(
-              child: _MetricTile(
-                title: '往返延迟 (RTT)',
-                value: '$rtt ms',
-                icon: Icons.wifi_rounded,
-                iconColor: rttColor,
+            return GlassContainer(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              borderRadius: 18,
+              child: Row(
+                children: [
+                  // 延迟 Pill
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: rttColor,
+                            boxShadow: [
+                              BoxShadow(color: rttColor.withValues(alpha: 0.5), blurRadius: 4),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '网络时延 (RTT)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                            Text(
+                              rtt == 0 ? '--' : '$rtt ms',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: rttColor,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 分隔线
+                  Container(
+                    width: 1,
+                    height: 24,
+                    color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+                  ),
+                  const SizedBox(width: 12),
+
+                  // 误差 Pill
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '校准误差 (Offset)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        Text(
+                          offset >= 0 ? '+$offset ms' : '$offset ms',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 立即同步按钮
+                  IconButton(
+                    tooltip: '即时测速对时 (${currentSvc.name})',
+                    icon: _isSyncing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          )
+                        : const Icon(LucideIcons.refreshCw, size: 18, color: AppColors.primary),
+                    onPressed: _isSyncing ? null : _triggerSync,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MetricTile(
-                title: '时间误差 (Offset)',
-                value: '$offsetSec s',
-                icon: Icons.balance_rounded,
-                iconColor: Theme.of(context).colorScheme.primary,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 3. 整合的悬浮窗时钟设置专区
+  Widget _buildFloatingClockSettingsCard(BuildContext context, bool isDark) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppService.floatingEnabledNotifier,
+      builder: (context, enabled, _) {
+        return GlassContainer(
+          padding: const EdgeInsets.all(18),
+          borderRadius: 22,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 顶行：标题与开关
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (enabled ? AppColors.primary : AppColors.accentIndigo)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      LucideIcons.layers,
+                      size: 18,
+                      color: enabled ? AppColors.primary : AppColors.accentIndigo,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '悬浮窗时钟',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '置顶悬浮在桌面与其他 App 上方，精准秒杀',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: enabled,
+                    onChanged: (val) async {
+                      HapticFeedback.lightImpact();
+                      await AppService.setFloatingEnabled(val);
+                      await FloatingClockManager.updateSystemOverlayState(val);
+                      _checkPermission();
+                    },
+                  ),
+                ],
               ),
-            ),
-          ],
+
+              // Android 权限提示
+              if (Platform.isAndroid && !_isSystemPermissionGranted) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(LucideIcons.alertTriangle, size: 16, color: AppColors.warning),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          '需要「悬浮窗权限」以支持桌面全局置顶',
+                          style: TextStyle(fontSize: 11, color: AppColors.warning, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await FloatingClockManager.requestSystemOverlayPermission();
+                          _checkPermission();
+                        },
+                        child: const Text('去授权', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (enabled) ...[
+                const SizedBox(height: 16),
+                Divider(
+                  height: 1,
+                  color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+                ),
+                const SizedBox(height: 14),
+
+                // 缩放大小调节
+                ValueListenableBuilder<double>(
+                  valueListenable: AppService.floatingScaleNotifier,
+                  builder: (context, scale, _) {
+                    return Row(
+                      children: [
+                        const Icon(LucideIcons.scaling, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          '悬浮窗大小 (${scale.toStringAsFixed(1)}x)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          ),
+                        ),
+                        Expanded(
+                          child: Slider(
+                            value: scale,
+                            min: 0.8,
+                            max: 1.8,
+                            divisions: 10,
+                            onChanged: (val) {
+                              AppService.setFloatingScale(val);
+                              FloatingClockManager.syncOverlayData();
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                // 显示选项：毫秒开关
+                ValueListenableBuilder<bool>(
+                  valueListenable: AppService.floatingShowMsNotifier,
+                  builder: (context, showMs, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '悬浮窗显示毫秒 (.xxx)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        Switch(
+                          value: showMs,
+                          onChanged: (val) {
+                            AppService.setFloatingShowMs(val);
+                            FloatingClockManager.syncOverlayData();
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
   }
 }
 
-class _MetricTile extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color iconColor;
-  const _MetricTile({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.iconColor,
+/// 高精度 0~10 刻度线与时间标识绘制器 (对应 0~1000ms)
+class _MillisecondTickPainter extends CustomPainter {
+  final bool isDark;
+  final double currentProgress;
+
+  _MillisecondTickPainter({
+    required this.isDark,
+    required this.currentProgress,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 15, color: iconColor),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.55),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                color: cs.onSurface,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+  void paint(Canvas canvas, Size size) {
+    final tickPaint = Paint()..strokeWidth = 1.0;
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
-class _MsProgressCard extends StatelessWidget {
-  final DateTime currentTime;
-  const _MsProgressCard({required this.currentTime});
+    final inactiveTickColor = isDark
+        ? Colors.white.withValues(alpha: 0.18)
+        : const Color(0xFF94A3B8);
+
+    final activeTickColor = AppColors.primary;
+
+    final labelStyle = TextStyle(
+      fontSize: 9,
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
+    );
+
+    // 绘制 0 ~ 10 主刻度 (共 11 个点，对应 0ms, 100ms, 200ms ... 1000ms)
+    for (int i = 0; i <= 10; i++) {
+      final x = (size.width * i) / 10.0;
+      final isPassed = (i / 10.0) <= currentProgress;
+
+      tickPaint.color = isPassed ? activeTickColor : inactiveTickColor;
+
+      // 刻度线 (0, 5, 10 略长，其余等齐)
+      final tickHeight = (i == 0 || i == 5 || i == 10) ? 4.5 : 3.0;
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, tickHeight),
+        tickPaint,
+      );
+
+      // 绘制 0 ~ 10 刻度数值
+      final labelText = '$i';
+      textPainter.text = TextSpan(
+        text: labelText,
+        style: labelStyle.copyWith(
+          color: isPassed ? AppColors.primary : null,
+          fontWeight: isPassed ? FontWeight.bold : FontWeight.w500,
+        ),
+      );
+      textPainter.layout();
+
+      // 居中/边界对齐
+      double textX = x - (textPainter.width / 2.0);
+      if (i == 0) textX = 0;
+      if (i == 10) textX = size.width - textPainter.width;
+
+      textPainter.paint(canvas, Offset(textX, 5));
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final msValue = currentTime.millisecond;
-    final progress = msValue / 1000.0;
-    final msStr = msValue.toString().padLeft(3, '0');
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '0 ms',
-                  style: TextStyle(
-                    color: cs.onSurface.withValues(alpha: 0.45),
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '当前进度: ',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.55),
-                          fontSize: 12,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '$msStr ms / 1000 ms',
-                        style: TextStyle(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '1000 ms',
-                  style: TextStyle(
-                    color: cs.onSurface.withValues(alpha: 0.45),
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 12,
-                backgroundColor: cs.primary.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
-              ),
-            ),
-            const SizedBox(height: 6),
-            _ProgressScale(color: cs.onSurface),
-          ],
-        ),
-      ),
-    );
+  bool shouldRepaint(covariant _MillisecondTickPainter oldDelegate) {
+    return oldDelegate.currentProgress != currentProgress ||
+        oldDelegate.isDark != isDark;
   }
 }
 
-class _ProgressScale extends StatelessWidget {
-  final Color color;
-  const _ProgressScale({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Scale tick marks (0 to 10)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(11, (i) {
-            final isMajor = i == 0 || i == 5 || i == 10;
-            return Container(
-              width: isMajor ? 2 : 1,
-              height: isMajor ? 6 : 4,
-              decoration: BoxDecoration(
-                color: isMajor
-                    ? color.withValues(alpha: 0.6)
-                    : color.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(1),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 2),
-        // Scale numbers (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(11, (i) {
-            final isMajor = i == 0 || i == 5 || i == 10;
-            return SizedBox(
-              width: 14,
-              child: Text(
-                '$i',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isMajor
-                      ? color.withValues(alpha: 0.75)
-                      : color.withValues(alpha: 0.4),
-                  fontSize: 10,
-                  fontWeight: isMajor ? FontWeight.bold : FontWeight.w500,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-}

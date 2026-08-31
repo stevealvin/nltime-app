@@ -1,5 +1,5 @@
-name: nltime
-description: "A new Flutter project."
+name: omniflow
+description: "星环流动 OmniFlow 移动端伴侣应用"
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 version: 1.0.0+1
@@ -25,7 +25,14 @@ dependencies:
   flutter_js: ^0.8.7
   crypto: ^3.0.6
   qr_flutter: ^4.1.0
+  url_launcher: ^6.3.1
+  peerdart: ^0.5.6
+  flutter_webrtc: ^1.6.0+hotfix.1
+  image_picker: ^1.2.3
+  webview_flutter: ^4.14.1
 
+dependency_overrides:
+  flutter_webrtc: ^1.6.0+hotfix.1
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +54,7 @@ flutter:
 
   assets:
     - assets/icon/icon.png
+    - assets/logo.png
     - assets/js/cliguard.js
     - assets/js/node_shim.js
     - assets/js/pako.min.js

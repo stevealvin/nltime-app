@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../common/app_service.dart';
-import '../views/app_dialog.dart';
+import '../core/network/api_client.dart';
+import '../core/storage/app_storage.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/glass_container.dart';
+import '../views/app_webview_page.dart';
 import '../views/time_service_form_dialog.dart';
 
-/// Settings page — pure content widget, no inner Scaffold.
+/// Apple 极简分组风格设置页面 (Inset Grouped Architecture)
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -14,267 +19,456 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final packageInfo = AppService.packageInfo;
+  late TextEditingController _baseUrlController;
+  bool _isTestingPing = false;
+  int? _pingResultMs;
+  String? _pingError;
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      children: [
-        _buildTimeSourcesCard(context),
-        const SizedBox(height: 16),
-        _buildAboutCard(context),
-        const SizedBox(height: 8),
-      ],
-    );
+  void initState() {
+    super.initState();
+    _baseUrlController = TextEditingController(text: AppStorage.baseUrl);
   }
-
-  // ── Theme selector ─────────────────────────────────────────────────────────
-
-  // ── Time sources manager ───────────────────────────────────────────────────
-
-  Widget _buildTimeSourcesCard(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final services = AppService.timeServices;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.language_rounded, size: 18, color: cs.secondary),
-                    const SizedBox(width: 8),
-                    Text(
-                      '授时服务器列表',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  icon: Icon(Icons.add_rounded, color: cs.primary),
-                  tooltip: '添加自定义接口',
-                  onPressed: () async {
-                    final data = await TimeServiceFormDialog.show(context);
-                    if (data == null) return;
-                    final newSvc = await AppService.addCustomTimeService(
-                      name: data.name,
-                      url: data.url,
-                      parseType: data.parseType,
-                      customKey: data.customKey,
-                    );
-                    await AppService.setCurrentTimeService(newSvc.id);
-                    setState(() {});
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ValueListenableBuilder<String>(
-              valueListenable: AppService.activeServiceIdNotifier,
-              builder: (context, activeId, _) {
-                return RadioGroup<String>(
-                  groupValue: activeId,
-                  onChanged: (val) {
-                    if (val != null) AppService.setCurrentTimeService(val);
-                  },
-                  child: Column(
-                    children: [
-                      for (int i = 0; i < services.length; i++) ...[
-                        if (i > 0) const Divider(height: 1),
-                        _ServiceTile(
-                          item: services[i],
-                          isSelected: services[i].id == activeId,
-                          onEdit: () async {
-                            final data = await TimeServiceFormDialog.show(
-                              context,
-                              service: services[i],
-                            );
-                            if (data == null) return;
-                            await AppService.updateCustomTimeService(
-                              id: services[i].id,
-                              name: data.name,
-                              url: data.url,
-                              parseType: data.parseType,
-                              customKey: data.customKey,
-                            );
-                            setState(() {});
-                          },
-                          onDelete: () async {
-                            final item = services[i];
-                            final confirmed = await AppDialog.confirm(
-                              context: context,
-                              title: '删除授时接口',
-                              message: '确定要删除自定义接口 [${item.name}] 吗？',
-                              confirmText: '删除',
-                              confirmColor: Colors.redAccent,
-                              icon: Icons.delete_forever_rounded,
-                            );
-                            if (confirmed == true) {
-                              await AppService.deleteCustomTimeService(item.id);
-                              if (context.mounted) {
-                                AppDialog.showToast(
-                                  context: context,
-                                  message: '已成功删除接口 ${item.name}',
-                                );
-                              }
-                              setState(() {});
-                            }
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── About card ─────────────────────────────────────────────────────────────
-
-  Widget _buildAboutCard(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                'assets/icon/icon.png',
-                width: 54,
-                height: 54,
-                errorBuilder: (_, _, _) => Container(
-                  width: 54,
-                  height: 54,
-                  color: cs.primary,
-                  child: Icon(Icons.access_time_filled_rounded,
-                      color: cs.onPrimary, size: 30),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '极速对时',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '版本 v${packageInfo.version} (${packageInfo.buildNumber})',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.55),
-                        ),
-                  ),
-                  Text(
-                    '网络 RTT 时延补偿算法与毫秒悬浮',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.4),
-                          fontSize: 11,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Service list tile ─────────────────────────────────────────────────────────
-
-class _ServiceTile extends StatelessWidget {
-  final dynamic item; // TimeService
-  final bool isSelected;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _ServiceTile({
-    required this.item,
-    required this.isSelected,
-    required this.onEdit,
-    required this.onDelete,
-  });
 
   @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return RadioListTile<String>(
-      contentPadding: EdgeInsets.zero,
-      value: item.id as String,
-      title: Row(
-        children: [
-          Text(
-            item.name as String,
-            style: TextStyle(
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 14,
-            ),
+  void dispose() {
+    _baseUrlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleTestConnection() async {
+    final url = _baseUrlController.text.trim();
+    if (url.isEmpty) return;
+
+    setState(() {
+      _isTestingPing = true;
+      _pingResultMs = null;
+      _pingError = null;
+    });
+
+    HapticFeedback.lightImpact();
+
+    try {
+      final latency = await ApiClient.ping(url);
+      await AppStorage.setBaseUrl(url);
+      setState(() {
+        _pingResultMs = latency;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已连通 OmniFlow 服务端 ($latency ms) 并保存配置'),
+            backgroundColor: AppColors.success,
           ),
-          if (item.isBuiltin as bool) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _pingError = e.toString();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('连接失败: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTestingPing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('系统与偏好设置'),
+      ),
+      body: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        children: [
+          // 1. 服务端连接设置分组
+          _buildSectionHeader('服务端连接', isDark),
+          _buildServerGroup(context, isDark),
+          const SizedBox(height: 16),
+
+          // 2. 外观主题分段滑块 (永不换行)
+          _buildSectionHeader('外观主题', isDark),
+          _buildThemeSegmentGroup(context, isDark),
+          const SizedBox(height: 16),
+
+          // 3. NTP 授时服务源列表
+          _buildSectionHeader('NTP 授时服务源', isDark),
+          _buildTimeSourcesGroup(context, isDark),
+          const SizedBox(height: 16),
+
+          // 4. 关于应用
+          _buildSectionHeader('关于', isDark),
+          _buildAboutGroup(context, isDark),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  /// 分组标题
+  Widget _buildSectionHeader(String title, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  /// 1. 服务端配置分组
+  Widget _buildServerGroup(BuildContext context, bool isDark) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(16),
+      borderRadius: 18,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(LucideIcons.globe, size: 16, color: AppColors.primary),
               ),
-              child: Text(
-                '内置',
-                style: TextStyle(color: cs.primary, fontSize: 10),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'API 接口地址',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                  ),
+                ),
               ),
+              if (_pingResultMs != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$_pingResultMs ms',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _baseUrlController,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '如: https://om.nle.lol',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _isTestingPing ? null : _handleTestConnection,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: _isTestingPing
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('测速保存', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          if (_pingError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '连接失败: $_pingError',
+              style: const TextStyle(fontSize: 11, color: AppColors.danger),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
       ),
-      subtitle: Text(
-        item.url as String,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 11,
-          color: cs.onSurface.withValues(alpha: 0.5),
+    );
+  }
+
+  /// 2. 主题外观切换 (Apple 风格平滑分段滑块，永不折行)
+  Widget _buildThemeSegmentGroup(BuildContext context, bool isDark) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppStorage.themeModeNotifier,
+      builder: (context, currentMode, _) {
+        return GlassContainer(
+          padding: const EdgeInsets.all(6),
+          borderRadius: 16,
+          child: Row(
+            children: [
+              _buildSegmentPill(
+                context,
+                title: '跟随系统',
+                icon: LucideIcons.smartphone,
+                isSelected: currentMode == ThemeMode.system,
+                isDark: isDark,
+                onTap: () => AppStorage.setThemeMode(ThemeMode.system),
+              ),
+              _buildSegmentPill(
+                context,
+                title: '极简浅色',
+                icon: LucideIcons.sun,
+                isSelected: currentMode == ThemeMode.light,
+                isDark: isDark,
+                onTap: () => AppStorage.setThemeMode(ThemeMode.light),
+              ),
+              _buildSegmentPill(
+                context,
+                title: '深空深色',
+                icon: LucideIcons.moon,
+                isSelected: currentMode == ThemeMode.dark,
+                isDark: isDark,
+                onTap: () => AppStorage.setThemeMode(ThemeMode.dark),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSegmentPill(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected
+                    ? AppColors.primary
+                    : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)
+                      : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
-      secondary: (item.isBuiltin as bool)
-          ? null
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit_rounded,
-                      size: 16,
-                      color: cs.onSurface.withValues(alpha: 0.5)),
-                  onPressed: onEdit,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      size: 16, color: Colors.redAccent),
-                  onPressed: onDelete,
+    );
+  }
+
+  /// 3. NTP 授时服务源列表分组
+  Widget _buildTimeSourcesGroup(BuildContext context, bool isDark) {
+    final services = AppService.timeServices;
+
+    return ValueListenableBuilder<String>(
+      valueListenable: AppService.activeServiceIdNotifier,
+      builder: (context, activeId, _) {
+        return GlassContainer(
+          padding: EdgeInsets.zero,
+          borderRadius: 18,
+          child: Column(
+            children: [
+              for (int i = 0; i < services.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+                  ),
+                ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                  leading: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: (services[i].id == activeId ? AppColors.primary : AppColors.accentIndigo)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      LucideIcons.radio,
+                      size: 15,
+                      color: services[i].id == activeId ? AppColors.primary : AppColors.accentIndigo,
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(
+                        services[i].name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: services[i].id == activeId ? FontWeight.w700 : FontWeight.w500,
+                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        ),
+                      ),
+                      if (!services[i].isBuiltin) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('自定义', style: TextStyle(fontSize: 9, color: AppColors.primary)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(
+                    services[i].parseType.name.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
+                    ),
+                  ),
+                  trailing: services[i].id == activeId
+                      ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
+                      : null,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    AppService.setCurrentTimeService(services[i].id);
+                  },
                 ),
               ],
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+              ),
+              InkWell(
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (context) => const TimeServiceFormDialog(),
+                ),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(LucideIcons.plus, size: 15, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        '添加自定义授时源',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 4. 关于应用分组
+  Widget _buildAboutGroup(BuildContext context, bool isDark) {
+    return GlassContainer(
+      padding: EdgeInsets.zero,
+      borderRadius: 18,
+      child: Column(
+        children: [
+          ListTile(
+            dense: true,
+            leading: const Icon(LucideIcons.sparkles, size: 16, color: AppColors.primary),
+            title: const Text('应用全称', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            trailing: Text(
+              '星环流动 OmniFlow',
+              style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
             ),
+          ),
+          Divider(height: 1, thickness: 0.5, color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder),
+          ListTile(
+            dense: true,
+            leading: const Icon(LucideIcons.info, size: 16, color: AppColors.accentSky),
+            title: const Text('版本号', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            trailing: Text(
+              'v${packageInfo.version}+${packageInfo.buildNumber}',
+              style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+            ),
+          ),
+          Divider(height: 1, thickness: 0.5, color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder),
+          ListTile(
+            dense: true,
+            leading: const Icon(LucideIcons.externalLink, size: 16, color: AppColors.accentIndigo),
+            title: const Text('官方网站 / 知识库', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            trailing: const Icon(LucideIcons.chevronRight, size: 14),
+            onTap: () => AppWebViewPage.open(context, url: 'https://om.nle.lol', title: '星环流动 OmniFlow'),
+          ),
+        ],
+      ),
     );
   }
 }

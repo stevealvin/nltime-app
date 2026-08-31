@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart' as dcrypto;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_js/flutter_js.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'coupon_model.dart';
@@ -21,6 +22,7 @@ class MtPassport {
   static bool _initialized = false;
 
   static String? _cliguardInfoPath;
+  static String _resolvedPackageName = 'com.nl.omniflow';
 
   static const String clientId = 'c6f50b5a1e2f4e2bb00a3e2f58df3ced';
   static const String csecPlatform = '7';
@@ -45,7 +47,18 @@ class MtPassport {
 
   static Future<void> init() async {
     if (_initialized) return;
+
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (info.packageName.isNotEmpty) {
+        _resolvedPackageName = info.packageName;
+      }
+    } catch (_) {}
+
     _runtime = getJavascriptRuntime();
+
+    final home = '/data/user/0/$_resolvedPackageName';
+    _runtime!.evaluate('globalThis.__packageName = ${jsonEncode(_resolvedPackageName)}; globalThis.__homedir = ${jsonEncode(home)};');
 
     // 1. node_shim（Node API 纯 JS 实现 + Buffer/MD5/AES 内联）
     _runtime!.evaluate(await rootBundle.loadString('assets/js/node_shim.js'));
@@ -235,7 +248,7 @@ class MtPassport {
 
   static String get _infoPath {
     if (_cliguardInfoPath != null) return _cliguardInfoPath!;
-    final home = '/data/user/0/com.nl.nltime';
+    final home = '/data/user/0/$_resolvedPackageName';
     _cliguardInfoPath = '$home/.cliguard/cliguard-info.json';
     return _cliguardInfoPath!;
   }

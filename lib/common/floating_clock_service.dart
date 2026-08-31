@@ -6,7 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'app_service.dart';
 
 class FloatingClockManager {
-  static const MethodChannel _channel = MethodChannel('com.nl.nltime/overlay');
+  static const MethodChannel _channel = MethodChannel('com.nl.omniflow/overlay');
   static bool _isSystemWindowActive = false;
 
   /// Request system overlay permission using permission_handler & native intent

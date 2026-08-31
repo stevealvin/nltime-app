@@ -1,4 +1,4 @@
-package com.nl.nltime
+package com.nl.omniflow
 
 import android.app.AppOpsManager
 import android.content.Context
@@ -12,7 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.nl.nltime/overlay"
+    private val CHANNEL = "com.nl.omniflow/overlay"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

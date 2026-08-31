@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../common/app_service.dart';
-import '../coupon/coupon_page.dart';
-import 'floating_page.dart';
-import 'home.dart';
-import 'settings.dart';
-import 'stopwatch_page.dart';
+import '../core/storage/app_storage.dart';
+import '../core/theme/app_colors.dart';
+import '../features/apps/pages/apps_page.dart';
+import '../features/drop/pages/drop_page.dart';
+import '../features/hub/pages/hub_page.dart';
+import '../features/quota/pages/quota_page.dart';
 
-/// Root shell page. Contains the ONLY Scaffold in the navigation stack.
-/// Child pages (HomePage, FloatingPage, etc.) are plain widgets — NO inner Scaffold.
+/// OmniFlow 移动端伴侣应用主框架页 (AppShell)
 class AppPage extends StatefulWidget {
   const AppPage({super.key});
 
@@ -22,53 +23,45 @@ class _AppPageState extends State<AppPage> {
 
   static const _destinations = [
     NavigationDestination(
-      icon: Icon(Icons.access_time_outlined),
-      selectedIcon: Icon(Icons.access_time_filled_rounded),
-      label: '极准时钟',
+      icon: Icon(LucideIcons.sparkles),
+      selectedIcon: Icon(LucideIcons.sparkle),
+      label: '算力配额',
     ),
     NavigationDestination(
-      icon: Icon(Icons.layers_outlined),
-      selectedIcon: Icon(Icons.layers_rounded),
-      label: '悬浮窗',
+      icon: Icon(LucideIcons.layoutGrid),
+      selectedIcon: Icon(LucideIcons.grid),
+      label: '应用工坊',
     ),
     NavigationDestination(
-      icon: Icon(Icons.timer_outlined),
-      selectedIcon: Icon(Icons.timer_rounded),
-      label: '毫秒秒表',
+      icon: Icon(LucideIcons.radio),
+      selectedIcon: Icon(LucideIcons.radioTower),
+      label: '流转空间',
     ),
     NavigationDestination(
-      icon: Icon(Icons.confirmation_num_outlined),
-      selectedIcon: Icon(Icons.confirmation_num_rounded),
-      label: '领券',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.settings_outlined),
-      selectedIcon: Icon(Icons.settings_rounded),
-      label: '设置',
+      icon: Icon(LucideIcons.box),
+      selectedIcon: Icon(LucideIcons.boxes),
+      label: '极客工作台',
     ),
   ];
 
-  static const _titles = ['极速对时', '悬浮窗时钟', '毫秒秒表', '美团领券', '设置中心'];
+  static const _titles = ['AI 算力中枢', '应用与产品矩阵', 'OmniDrop 流转空间', '极客工作台'];
   static const _icons = [
-    Icons.schedule_rounded,
-    Icons.layers_rounded,
-    Icons.timer_rounded,
-    Icons.confirmation_num_rounded,
-    Icons.settings_rounded,
+    LucideIcons.sparkles,
+    LucideIcons.layoutGrid,
+    LucideIcons.radio,
+    LucideIcons.box,
   ];
 
-  // Pages are kept alive via IndexedStack — no Scaffold inside each.
   final List<Widget> _pages = const [
-    HomePage(),
-    FloatingPage(),
-    StopwatchPage(),
-    CouponPage(),
-    SettingsPage(),
+    QuotaPage(),
+    AppsPage(),
+    DropPage(),
+    HubPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -79,16 +72,58 @@ class _AppPageState extends State<AppPage> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(_icons[_currentIndex], color: cs.primary, size: 20),
+              child: Icon(_icons[_currentIndex], color: AppColors.primary, size: 18),
             ),
             const SizedBox(width: 10),
-            Text(_titles[_currentIndex]),
+            Text(
+              _titles[_currentIndex],
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                letterSpacing: -0.4,
+              ),
+            ),
           ],
         ),
-        actions: _buildActions(context, cs),
+        actions: [
+          // 主题快速切换
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: AppStorage.themeModeNotifier,
+            builder: (context, mode, _) {
+              final isCurrentDark = mode == ThemeMode.dark ||
+                  (mode == ThemeMode.system &&
+                      MediaQuery.of(context).platformBrightness == Brightness.dark);
+              return IconButton(
+                tooltip: isCurrentDark ? '切换浅色模式' : '切换深色模式',
+                icon: Icon(
+                  isCurrentDark ? LucideIcons.sun : LucideIcons.moon,
+                  size: 20,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  AppStorage.setThemeMode(isCurrentDark ? ThemeMode.light : ThemeMode.dark);
+                },
+              );
+            },
+          ),
+
+          // 设置入口
+          IconButton(
+            tooltip: '系统与偏好设置',
+            icon: Icon(
+              LucideIcons.settings,
+              size: 20,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            ),
+            onPressed: () => context.push('/settings'),
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
       body: IndexedStack(
         index: _currentIndex,
@@ -98,14 +133,17 @@ class _AppPageState extends State<AppPage> {
         decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: Theme.of(context).dividerColor,
+              color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
               width: 1,
             ),
           ),
         ),
         child: NavigationBar(
           selectedIndex: _currentIndex,
-          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          onDestinationSelected: (i) {
+            HapticFeedback.selectionClick();
+            setState(() => _currentIndex = i);
+          },
           destinations: _destinations,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           animationDuration: const Duration(milliseconds: 300),
@@ -113,43 +151,4 @@ class _AppPageState extends State<AppPage> {
       ),
     );
   }
-
-  List<Widget> _buildActions(BuildContext context, ColorScheme cs) {
-    if (_currentIndex == 0) {
-      // Home page actions: fullscreen + sync
-      return [
-        IconButton(
-          tooltip: '全屏桌面时钟',
-          icon: Icon(Icons.fullscreen_rounded, color: cs.onSurface),
-          onPressed: () => context.push('/fullscreen'),
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: AppService.isSyncingNotifier,
-          builder: (context, isSyncing, _) {
-            return AnimatedRotation(
-              turns: isSyncing ? 1 : 0,
-              duration: const Duration(milliseconds: 600),
-              child: IconButton(
-                tooltip: '即时测速与同步',
-                icon: Icon(Icons.refresh_rounded, color: cs.primary),
-                onPressed: isSyncing
-                    ? null
-                    : () {
-                        // Notify HomePage to trigger sync via GlobalKey or callback
-                        HomePageController.triggerSync?.call();
-                      },
-              ),
-            );
-          },
-        ),
-        const SizedBox(width: 6),
-      ];
-    }
-    return [];
-  }
-}
-
-/// Simple static callback so AppPage can trigger a sync action inside HomePage.
-abstract class HomePageController {
-  static VoidCallback? triggerSync;
 }

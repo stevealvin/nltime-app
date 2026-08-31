@@ -1,11 +1,11 @@
 {
-    "name": "nltime",
-    "short_name": "nltime",
+    "name": "星环流动 OmniFlow",
+    "short_name": "星环流动",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D9488",
+    "theme_color": "#0D9488",
+    "description": "星环流动 (OmniFlow) 移动端伴侣应用",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

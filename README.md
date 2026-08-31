@@ -1,16 +1,23 @@
-# nltime
+# 🪐 星环流动 (OmniFlow) 移动伴侣应用
 
-A new Flutter project.
+**个人全栈开发者 AI 算力资产与多端微服务控制中枢 - 移动端工作台**
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🌟 核心特性
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- ⚡ **AI 算力配额全景洞察**：
+  - 实时解析并聚合 Google Antigravity（Gemini / Claude / GPT 模型组）与 OpenAI Codex 托管账号配额。
+  - 精准计算 5 小时重置窗口、每周重置倒计时与使用百分比。
+- 🛡️ **API Key 智能探针与健康检测**：
+  - 自动向各大模型上游接口发送探针检测，获取实时 RPM、TPM 剩余容量及网络往返延迟（Latency）。
+- 🌌 **个人 AI 应用生态矩阵 (App Hub)**：
+  - 集中聚合管理个人构建的垂直 AI 微服务入口，支持一键直达、安装包下载与二维码分享。
+- 📡 **流转空间 (OmniDrop)**：
+  - 4 位房间号配对，跨设备极速流转文本、剪贴板内容与图片。
+- ⏱️ **极速网络对时与悬浮时钟**：
+  - 毫秒级网络授时与时延补偿，支持全局系统级悬浮窗时钟。
+- 🎟️ **美团极速领券**：
+  - 自动化领券与定时任务。
+- 🎨 **Apple 极简与现代毛玻璃美学**：
+  - 全面遵循 Material 3 规范语法，支持沉浸式深色 / 浅色模式切换与 120 FPS 丝滑物理交互。

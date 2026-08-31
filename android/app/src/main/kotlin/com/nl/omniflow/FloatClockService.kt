@@ -1,4 +1,4 @@
-package com.nl.nltime
+package com.nl.omniflow
 
 import android.app.*
 import android.content.Context
@@ -69,7 +69,7 @@ class FloatClockService : Service() {
         var scale: Float = 1.2f
         var themeIdx: Int = 0
 
-        const val CHANNEL_ID = "nltime_float_channel"
+        const val CHANNEL_ID = "omniflow_float_channel"
         const val NOTIFICATION_ID = 1001
 
         fun updateParams(

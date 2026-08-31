@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:nltime/router.dart';
-
 import 'common/app_service.dart';
-import 'common/theme_manager.dart';
+import 'core/storage/app_storage.dart';
+import 'core/theme/app_theme.dart';
+import 'router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 设置沉浸式透明状态栏
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+    ),
+  );
 
   // Custom ErrorWidget builder so release mode doesn't swallow errors as blank screens
   ErrorWidget.builder = (FlutterErrorDetails details) {
@@ -31,7 +40,9 @@ void main() async {
     await initializeDateFormatting('zh_CN', null);
   } catch (_) {}
 
+  await AppStorage.init();
   await AppService.init();
+
   runApp(const MyApp());
 }
 
@@ -40,21 +51,27 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: '极速对时',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeManager.lightTheme.themeData,
-      themeMode: ThemeMode.light,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('zh', 'CN'),
-        Locale('en', 'US'),
-      ],
-      routerConfig: router,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppStorage.themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp.router(
+          title: '星环流动 OmniFlow',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('zh', 'CN'),
+            Locale('en', 'US'),
+          ],
+          routerConfig: router,
+        );
+      },
     );
   }
 }

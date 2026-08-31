@@ -1,29 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'coupon/coupon_page.dart';
 import 'pages/app.dart';
-import 'pages/fullscreen_clock_page.dart';
+import 'pages/home.dart';
 import 'pages/settings.dart';
 
 final GoRouter router = GoRouter(
+  initialLocation: '/',
   routes: <RouteBase>[
     GoRoute(
       path: '/',
-      builder: (BuildContext context, GoRouterState state) {
-        return const AppPage();
-      },
+      builder: (BuildContext context, GoRouterState state) => const AppPage(),
     ),
     GoRoute(
       path: '/settings',
-      builder: (BuildContext context, GoRouterState state) {
-        return const SettingsPage();
-      },
+      builder: (BuildContext context, GoRouterState state) => const SettingsPage(),
     ),
     GoRoute(
-      path: '/fullscreen',
-      builder: (BuildContext context, GoRouterState state) {
-        return const FullscreenClockPage();
-      },
+      path: '/clock',
+      builder: (BuildContext context, GoRouterState state) => Scaffold(
+        appBar: AppBar(title: const Text('极速对时')),
+        body: const HomePage(),
+      ),
+    ),
+    GoRoute(
+      path: '/coupon',
+      builder: (BuildContext context, GoRouterState state) => Scaffold(
+        appBar: AppBar(title: const Text('美团领券助手')),
+        body: const CouponPage(),
+      ),
     ),
   ],
 );
