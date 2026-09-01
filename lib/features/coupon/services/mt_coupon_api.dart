@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
-import 'coupon_model.dart';
+import '../models/coupon_model.dart';
 import 'mt_passport.dart';
 
 /// 美团领券接口封装，与 Node 版 issueCoupon / checkLoginStatus 保持一致。

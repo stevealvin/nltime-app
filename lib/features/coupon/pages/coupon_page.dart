@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import 'coupon_model.dart';
-import 'mt_account_store.dart';
-import 'mt_coupon_api.dart';
-import 'mt_passport.dart';
+import '../models/coupon_model.dart';
+import '../services/mt_account_store.dart';
+import '../services/mt_coupon_api.dart';
+import '../services/mt_passport.dart';
 
 /// Coupon page — pure content widget, no inner Scaffold.
 /// Mounted inside AppPage's IndexedStack which provides the single root Scaffold.

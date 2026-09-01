@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../common/app_service.dart';
-import '../core/network/api_client.dart';
-import '../core/storage/app_storage.dart';
-import '../core/theme/app_colors.dart';
-import '../core/theme/glass_container.dart';
-import '../views/app_webview_page.dart';
-import '../views/time_service_form_dialog.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/storage/app_storage.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/glass_container.dart';
+import '../../../shared/views/app_webview_page.dart';
+import '../../clock/services/app_service.dart';
 
 /// Apple 极简分组风格设置页面 (Inset Grouped Architecture)
 class SettingsPage extends StatefulWidget {
@@ -101,12 +100,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildThemeSegmentGroup(context, isDark),
           const SizedBox(height: 16),
 
-          // 3. NTP 授时服务源列表
-          _buildSectionHeader('NTP 授时服务源', isDark),
-          _buildTimeSourcesGroup(context, isDark),
-          const SizedBox(height: 16),
-
-          // 4. 关于应用
+          // 3. 关于应用
           _buildSectionHeader('关于', isDark),
           _buildAboutGroup(context, isDark),
           const SizedBox(height: 32),
@@ -326,114 +320,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  /// 3. NTP 授时服务源列表分组
-  Widget _buildTimeSourcesGroup(BuildContext context, bool isDark) {
-    final services = AppService.timeServices;
-
-    return ValueListenableBuilder<String>(
-      valueListenable: AppService.activeServiceIdNotifier,
-      builder: (context, activeId, _) {
-        return GlassContainer(
-          padding: EdgeInsets.zero,
-          borderRadius: 18,
-          child: Column(
-            children: [
-              for (int i = 0; i < services.length; i++) ...[
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
-                  ),
-                ListTile(
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                  leading: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: (services[i].id == activeId ? AppColors.primary : AppColors.accentIndigo)
-                          .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      LucideIcons.radio,
-                      size: 15,
-                      color: services[i].id == activeId ? AppColors.primary : AppColors.accentIndigo,
-                    ),
-                  ),
-                  title: Row(
-                    children: [
-                      Text(
-                        services[i].name,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: services[i].id == activeId ? FontWeight.w700 : FontWeight.w500,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                        ),
-                      ),
-                      if (!services[i].isBuiltin) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('自定义', style: TextStyle(fontSize: 9, color: AppColors.primary)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  subtitle: Text(
-                    services[i].parseType.name.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
-                    ),
-                  ),
-                  trailing: services[i].id == activeId
-                      ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
-                      : null,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    AppService.setCurrentTimeService(services[i].id);
-                  },
-                ),
-              ],
-              Divider(
-                height: 1,
-                thickness: 0.5,
-                color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
-              ),
-              InkWell(
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (context) => const TimeServiceFormDialog(),
-                ),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(LucideIcons.plus, size: 15, color: AppColors.primary),
-                      SizedBox(width: 6),
-                      Text(
-                        '添加自定义授时源',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// 4. 关于应用分组
+  /// 3. 关于应用分组
   Widget _buildAboutGroup(BuildContext context, bool isDark) {
     return GlassContainer(
       padding: EdgeInsets.zero,
@@ -463,7 +350,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             dense: true,
             leading: const Icon(LucideIcons.externalLink, size: 16, color: AppColors.accentIndigo),
-            title: const Text('官方网站 / 知识库', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            title: const Text('官方网站', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             trailing: const Icon(LucideIcons.chevronRight, size: 14),
             onTap: () => AppWebViewPage.open(context, url: 'https://om.nle.lol', title: '星环流动 OmniFlow'),
           ),

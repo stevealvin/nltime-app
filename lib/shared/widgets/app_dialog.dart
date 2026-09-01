@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import '../common/theme_manager.dart';
+import 'package:material_ui/material_ui.dart';
+import '../../features/settings/services/theme_manager.dart';
 
 class AppDialog {
   /// Show a custom branded confirmation dialog matching the app theme.

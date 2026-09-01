@@ -1,5 +1,5 @@
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 高性能 Apple 极简现代材质容器 (GlassContainer)
 /// 支持无描边纯净面材质与细腻环境阴影，最大化内容可用空间
@@ -90,7 +90,11 @@ class _GlassContainerState extends State<GlassContainer> {
       height: widget.height,
       padding: widget.padding,
       decoration: decoration,
-      child: widget.child,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: widget.child,
+      ),
     );
 
     if (widget.enableBlur) {

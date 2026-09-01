@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
@@ -87,6 +87,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.lightCard,
         elevation: 0,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: AppColors.lightCardBorder, width: 1),
@@ -210,6 +211,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.darkCard,
         elevation: 0,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: AppColors.darkCardBorder, width: 1),

@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-import '../common/theme_manager.dart';
+import '../../settings/services/theme_manager.dart';
 import '../models/time_service_model.dart';
 
 class TimeServiceFormData {

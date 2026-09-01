@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../common/app_service.dart';
-import '../common/floating_clock_service.dart';
-import '../core/theme/app_colors.dart';
-import '../core/theme/glass_container.dart';
-import '../views/app_dialog.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/glass_container.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../services/app_service.dart';
+import '../services/floating_clock_service.dart';
+import '../widgets/time_service_form_dialog.dart';
 
 abstract class HomePageController {
   static VoidCallback? triggerSync;
@@ -109,7 +110,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _buildCompressedMetricsCard(context, isDark),
         const SizedBox(height: 16),
 
-        // 3. 悬浮窗时钟设置专区 (整合)
+        // 3. NTP 授时服务源列表 (直接在对时页面切换)
+        _buildSectionHeader('NTP 授时服务源', isDark),
+        _buildTimeSourcesGroup(context, isDark),
+        const SizedBox(height: 16),
+
+        // 4. 悬浮窗时钟设置专区 (整合)
+        _buildSectionHeader('全局悬浮时钟', isDark),
         _buildFloatingClockSettingsCard(context, isDark),
         const SizedBox(height: 32),
       ],
@@ -150,21 +157,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 timeStr,
                 style: TextStyle(
                   fontSize: 46,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w400,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                  letterSpacing: -0.5,
+                  letterSpacing: 2.0,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 2),
               Text(
                 '.$msStr',
                 style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w500,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: AppColors.primary,
-                  letterSpacing: -0.5,
+                  letterSpacing: 1.0,
                 ),
               ),
             ],
@@ -521,6 +528,128 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   },
                 ),
               ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 分组标题
+  Widget _buildSectionHeader(String title, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  /// NTP 授时服务源列表分组
+  Widget _buildTimeSourcesGroup(BuildContext context, bool isDark) {
+    final services = AppService.timeServices;
+
+    return ValueListenableBuilder<String>(
+      valueListenable: AppService.activeServiceIdNotifier,
+      builder: (context, activeId, _) {
+        return GlassContainer(
+          padding: EdgeInsets.zero,
+          borderRadius: 18,
+          child: Column(
+            children: [
+              for (int i = 0; i < services.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+                  ),
+                ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                  leading: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: (services[i].id == activeId ? AppColors.primary : AppColors.accentIndigo)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      LucideIcons.radio,
+                      size: 15,
+                      color: services[i].id == activeId ? AppColors.primary : AppColors.accentIndigo,
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(
+                        services[i].name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: services[i].id == activeId ? FontWeight.w700 : FontWeight.w500,
+                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        ),
+                      ),
+                      if (!services[i].isBuiltin) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('自定义', style: TextStyle(fontSize: 9, color: AppColors.primary)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(
+                    services[i].parseType.name.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
+                    ),
+                  ),
+                  trailing: services[i].id == activeId
+                      ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary)
+                      : null,
+                  onTap: () {
+                    AppService.setCurrentTimeService(services[i].id);
+                    _triggerSync();
+                  },
+                ),
+              ],
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+              ),
+              InkWell(
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (context) => const TimeServiceFormDialog(),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(LucideIcons.plus, size: 15, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        '添加自定义授时源',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );

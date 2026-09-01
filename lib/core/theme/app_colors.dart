@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// OmniFlow 统一调色板与语义颜色规范
 class AppColors {

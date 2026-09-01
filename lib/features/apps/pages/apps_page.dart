@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/app_item_model.dart';
@@ -134,7 +134,7 @@ class _AppsPageState extends State<AppsPage> {
                     ),
                   ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                const SliverToBoxAdapter(child: SizedBox(height: 84)),
               ],
             ),
           ),

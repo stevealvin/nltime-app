@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
-import '../core/storage/app_storage.dart';
-import '../core/theme/app_colors.dart';
-import '../features/apps/pages/apps_page.dart';
-import '../features/drop/pages/drop_page.dart';
-import '../features/hub/pages/hub_page.dart';
-import '../features/quota/pages/quota_page.dart';
+import '../../../core/storage/app_storage.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../apps/pages/apps_page.dart';
+import '../../hub/pages/hub_page.dart';
+import '../../quota/pages/quota_page.dart';
 
 /// OmniFlow 移动端伴侣应用主框架页 (AppShell)
 class AppPage extends StatefulWidget {
@@ -23,6 +23,11 @@ class _AppPageState extends State<AppPage> {
 
   static const _destinations = [
     NavigationDestination(
+      icon: Icon(LucideIcons.layoutDashboard),
+      selectedIcon: Icon(LucideIcons.layoutDashboard),
+      label: '控制台',
+    ),
+    NavigationDestination(
       icon: Icon(LucideIcons.sparkles),
       selectedIcon: Icon(LucideIcons.sparkle),
       label: '算力配额',
@@ -32,31 +37,19 @@ class _AppPageState extends State<AppPage> {
       selectedIcon: Icon(LucideIcons.grid),
       label: '应用工坊',
     ),
-    NavigationDestination(
-      icon: Icon(LucideIcons.radio),
-      selectedIcon: Icon(LucideIcons.radioTower),
-      label: '流转空间',
-    ),
-    NavigationDestination(
-      icon: Icon(LucideIcons.box),
-      selectedIcon: Icon(LucideIcons.boxes),
-      label: '极客工作台',
-    ),
   ];
 
-  static const _titles = ['AI 算力中枢', '应用与产品矩阵', 'OmniDrop 流转空间', '极客工作台'];
+  static const _titles = ['星环控制台', 'AI 算力中枢', '应用与产品矩阵'];
   static const _icons = [
+    LucideIcons.layoutDashboard,
     LucideIcons.sparkles,
     LucideIcons.layoutGrid,
-    LucideIcons.radio,
-    LucideIcons.box,
   ];
 
   final List<Widget> _pages = const [
+    HubPage(),
     QuotaPage(),
     AppsPage(),
-    DropPage(),
-    HubPage(),
   ];
 
   @override
@@ -64,6 +57,7 @@ class _AppPageState extends State<AppPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(
         titleSpacing: 16,
         title: Row(
@@ -129,24 +123,26 @@ class _AppPageState extends State<AppPage> {
         index: _currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
-              width: 1,
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            color: isDark
+                ? const Color(0xFF0F172A).withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.72),
+            child: NavigationBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (i) {
+                setState(() => _currentIndex = i);
+              },
+              destinations: _destinations,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              animationDuration: const Duration(milliseconds: 300),
             ),
           ),
-        ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (i) {
-            HapticFeedback.selectionClick();
-            setState(() => _currentIndex = i);
-          },
-          destinations: _destinations,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          animationDuration: const Duration(milliseconds: 300),
         ),
       ),
     );

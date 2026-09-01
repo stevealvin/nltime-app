@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'coupon_model.dart';
+import '../models/coupon_model.dart';
 
 /// 多账号存储。风格对齐 AppService：静态成员 + ValueNotifier 驱动 UI。
 ///

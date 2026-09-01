@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 
-import 'coupon/coupon_page.dart';
-import 'pages/app.dart';
-import 'pages/home.dart';
-import 'pages/settings.dart';
+import 'features/clock/pages/clock_page.dart';
+import 'features/coupon/pages/coupon_page.dart';
+import 'features/settings/pages/settings_page.dart';
+import 'features/shell/pages/app_shell.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/',

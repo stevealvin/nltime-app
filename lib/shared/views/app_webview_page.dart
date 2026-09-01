@@ -1,10 +1,14 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import '../core/theme/app_colors.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 应用内内置极简 WebView 浏览页面 (In-App WebView)
 class AppWebViewPage extends StatefulWidget {
@@ -76,14 +80,161 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
                   setState(() => _pageTitle = t);
                 }
               } catch (_) {}
+
+              // 注入前端 Blob/下载监听钩子
+              try {
+                await _controller.runJavaScript('''
+                  (function() {
+                    if (window.__flutterDownloadHooked) return;
+                    window.__flutterDownloadHooked = true;
+                    document.addEventListener('click', function(e) {
+                      var target = e.target;
+                      while (target && target.tagName !== 'A') {
+                        target = target.parentElement;
+                      }
+                      if (target && target.tagName === 'A') {
+                        var href = target.getAttribute('href') || '';
+                        var download = target.getAttribute('download');
+                        if (download !== null || href.startsWith('blob:') || href.startsWith('data:')) {
+                          if (window.FlutterDownloadChannel && href.startsWith('blob:')) {
+                            fetch(href).then(r => r.blob()).then(blob => {
+                              var reader = new FileReader();
+                              reader.onloadend = function() {
+                                window.FlutterDownloadChannel.postMessage(JSON.stringify({
+                                  name: download || 'download_file',
+                                  data: reader.result
+                                }));
+                              };
+                              reader.readAsDataURL(blob);
+                            }).catch(console.error);
+                          }
+                        }
+                      }
+                    }, true);
+                  })();
+                ''');
+              } catch (_) {}
             }
+          },
+          onNavigationRequest: (NavigationRequest request) async {
+            final url = request.url;
+            final uri = Uri.tryParse(url);
+
+            // 1. 拦截非 http/https 自定义协议（如 intent://, market://, alipays://, weixin:// 等）
+            if (uri != null && uri.scheme != 'http' && uri.scheme != 'https') {
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+              return NavigationDecision.prevent;
+            }
+
+            // 2. 拦截常见二进制下载文件链接，唤起系统下载器或外部浏览器安全下载
+            final lowerUrl = url.toLowerCase();
+            const downloadExtensions = [
+              '.apk', '.zip', '.rar', '.7z', '.tar', '.gz',
+              '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+              '.mp3', '.mp4', '.avi', '.mov', '.dmg', '.exe', '.ipa'
+            ];
+
+            final isDownloadLink = downloadExtensions.any((ext) => lowerUrl.contains(ext));
+            if (isDownloadLink && uri != null) {
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('已唤起系统下载器进行下载'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+              return NavigationDecision.prevent;
+            }
+
+            return NavigationDecision.navigate;
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('WebView resource error: ${error.description}');
           },
         ),
       )
+      ..addJavaScriptChannel(
+        'FlutterDownloadChannel',
+        onMessageReceived: (JavaScriptMessage message) async {
+          try {
+            final data = jsonDecode(message.message) as Map<String, dynamic>;
+            final fileName = data['name'] ?? 'download_${DateTime.now().millisecondsSinceEpoch}';
+            final base64Data = data['data'] as String?;
+            if (base64Data != null && base64Data.isNotEmpty) {
+              final clean = base64Data.contains(',') ? base64Data.split(',').last : base64Data;
+              final bytes = base64Decode(clean);
+              final dir = Directory('/storage/emulated/0/Download');
+              final saveDir = dir.existsSync() ? dir : Directory.systemTemp;
+              final file = File('${saveDir.path}/$fileName');
+              await file.writeAsBytes(bytes);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(LucideIcons.checkCircle2, color: Colors.white, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text('文件已保存至: ${file.path}')),
+                      ],
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            debugPrint('Blob download error: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('下载保存失败: $e'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.red.shade700,
+                ),
+              );
+            }
+          }
+        },
+      )
       ..loadRequest(Uri.parse(widget.url));
+
+    // Android 原生文件上传选择器与权限配置
+    if (_controller.platform is AndroidWebViewController) {
+      final androidController = _controller.platform as AndroidWebViewController;
+      androidController.setMediaPlaybackRequiresUserGesture(false);
+      androidController.setOnPlatformPermissionRequest((request) {
+        request.grant();
+      });
+      androidController.setOnShowFileSelector((FileSelectorParams params) async {
+        try {
+          final ImagePicker picker = ImagePicker();
+          if (params.mode == FileSelectorMode.openMultiple) {
+            final List<XFile> medias = await picker.pickMultipleMedia();
+            return medias.map((e) => Uri.file(e.path).toString()).toList();
+          } else {
+            final accept = params.acceptTypes.join(',').toLowerCase();
+            if (accept.contains('video')) {
+              final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+              if (video != null) return [Uri.file(video.path).toString()];
+            } else {
+              final XFile? media = await picker.pickMedia();
+              if (media != null) return [Uri.file(media.path).toString()];
+            }
+          }
+        } catch (e) {
+          debugPrint('WebView file picker error: $e');
+        }
+        return [];
+      });
+    }
   }
 
   /// 提取域名 Host
@@ -274,36 +425,15 @@ class _AppWebViewPageState extends State<AppWebViewPage> {
               }
             },
           ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _pageTitle,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Row(
-                children: [
-                  const Icon(LucideIcons.lock, size: 9, color: AppColors.success),
-                  const SizedBox(width: 3),
-                  Text(
-                    _domainHost,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ],
+          title: Text(
+            _pageTitle,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           actions: [
             // 关闭按钮

@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/glass_container.dart';
-import '../../../views/app_webview_page.dart';
+import '../../../shared/views/app_webview_page.dart';
 import '../models/app_item_model.dart';
 
 /// 应用卡片组件
@@ -23,9 +23,6 @@ class AppCard extends StatelessWidget {
         return LucideIcons.apple;
       case 'web':
         return LucideIcons.globe;
-      case 'windows':
-      case 'macos':
-        return LucideIcons.laptop;
       default:
         return LucideIcons.package;
     }
@@ -39,10 +36,6 @@ class AppCard extends StatelessWidget {
         return const Color(0xFF64748B);
       case 'web':
         return AppColors.accentSky;
-      case 'windows':
-        return const Color(0xFF0284C7);
-      case 'macos':
-        return AppColors.accentPurple;
       default:
         return AppColors.primary;
     }
@@ -209,76 +202,91 @@ class AppCard extends StatelessWidget {
             ),
           ],
 
-          // 标签栏
-          if (app.tags.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: app.tags.map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '#$tag',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                );
-              }).toList(),
+          // 底部：左侧水平滑动标签栏 + 右侧操作按钮（下载 / 打开应用）
+          if (app.tags.isNotEmpty || hasFile || hasUrl) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 左侧标签栏（过多时支持左右水平滑动）
+                Expanded(
+                  child: app.tags.isNotEmpty
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: app.tags.map((tag) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.05)
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '#$tag',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+
+                const SizedBox(width: 8),
+
+                // 右侧操作按钮
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 安装包下载
+                    if (hasFile) ...[
+                      TextButton.icon(
+                        onPressed: () => _handleOpenUrl(context, app.fileUrl!, forceExternal: true),
+                        icon: const Icon(LucideIcons.download, size: 13),
+                        label: Text(
+                          app.fileSize != null ? '下载 (${app.fileSize})' : '下载',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+
+                    // 网址直达 (文字按钮「打开应用」)
+                    if (hasUrl)
+                      TextButton.icon(
+                        onPressed: () => _handleOpenUrl(context, app.url!),
+                        icon: const Icon(LucideIcons.arrowUpRight, size: 14, color: AppColors.primary),
+                        label: const Text(
+                          '打开应用',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ],
-
-          const SizedBox(height: 12),
-
-          // 底部操作区 (下载 / 打开应用)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // 安装包下载
-              if (hasFile) ...[
-                TextButton.icon(
-                  onPressed: () => _handleOpenUrl(context, app.fileUrl!, forceExternal: true),
-                  icon: const Icon(LucideIcons.download, size: 13),
-                  label: Text(
-                    app.fileSize != null ? '下载 (${app.fileSize})' : '下载安装包',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-
-              // 网址直达 (改为文字按钮「打开应用」)
-              if (hasUrl)
-                TextButton.icon(
-                  onPressed: () => _handleOpenUrl(context, app.url!),
-                  icon: const Icon(LucideIcons.arrowUpRight, size: 14, color: AppColors.primary),
-                  label: const Text(
-                    '打开应用',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  ),
-                ),
-            ],
-          ),
         ],
       ),
     );

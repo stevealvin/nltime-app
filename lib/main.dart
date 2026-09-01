@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'common/app_service.dart';
 import 'core/storage/app_storage.dart';
 import 'core/theme/app_theme.dart';
+import 'features/clock/services/app_service.dart';
 import 'router.dart';
 
 void main() async {
@@ -60,11 +59,7 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeMode,
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           supportedLocales: const [
             Locale('zh', 'CN'),
             Locale('en', 'US'),

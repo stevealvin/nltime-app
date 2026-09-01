@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/storage/app_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/glass_container.dart';
+import '../../../shared/views/app_webview_page.dart';
 
 /// 极客工作台主页面 (Workbench Hub)
 class HubPage extends StatelessWidget {
@@ -56,7 +58,7 @@ class HubPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'OmniFlow 极客工作台',
+                            'OmniFlow 控制台',
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
@@ -66,7 +68,7 @@ class HubPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '毫秒授时 · 悬浮窗 · 自动化领券 · 扩展工具箱',
+                            '毫秒授时 · 跨端流转 · 自动化领券 · 扩展工具箱',
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -97,7 +99,7 @@ class HubPage extends StatelessWidget {
             ),
           ),
 
-          // 工具卡片网格
+          // 工具卡片网格 (4 卡片响应式 2 列)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverGrid.count(
@@ -116,64 +118,37 @@ class HubPage extends StatelessWidget {
                 ),
                 _buildToolCard(
                   context,
+                  title: '流转空间 OmniDrop',
+                  subtitle: '跨设备点对点极速流转',
+                  icon: LucideIcons.radio,
+                  iconColor: AppColors.accentSky,
+                  onTap: () => AppWebViewPage.open(
+                    context,
+                    url: '${AppStorage.baseUrl}/drop',
+                    title: '流转空间 OmniDrop',
+                  ),
+                ),
+                _buildToolCard(
+                  context,
                   title: '美团领券助手',
                   subtitle: '神券秒杀与自动化任务',
                   icon: LucideIcons.ticket,
                   iconColor: const Color(0xFFF59E0B),
                   onTap: () => context.push('/coupon'),
                 ),
-              ],
-            ),
-          ),
-
-          // 系统与连接分类标题
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text(
-                '系统与连接',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ),
-
-          // 系统设置与偏好卡片
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList.list(
-              children: [
-                _buildListTileCard(
+                _buildToolCard(
                   context,
                   title: '系统与服务端配置',
-                  subtitle: 'OmniFlow API 地址配置、深浅主题、授时源管理',
+                  subtitle: 'API 设置与深浅主题',
                   icon: LucideIcons.settings,
                   iconColor: AppColors.accentPurple,
                   onTap: () => context.push('/settings'),
                 ),
-                const SizedBox(height: 10),
-                _buildListTileCard(
-                  context,
-                  title: '全球宏观行情看板',
-                  subtitle: 'BTC / ETH 蜡烛图与汇率走势 (即将推出)',
-                  icon: LucideIcons.trendingUp,
-                  iconColor: const Color(0xFF10B981),
-                  badge: 'Beta',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('全球宏观行情看板正在同步 Web 端数据中...')),
-                    );
-                  },
-                ),
               ],
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 60)),
+          const SliverToBoxAdapter(child: SizedBox(height: 84)),
         ],
       ),
     );
@@ -231,91 +206,6 @@ class HubPage extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListTileCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    String? badge,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GlassContainer(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      borderRadius: 18,
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20, color: iconColor),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          badge,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            LucideIcons.chevronRight,
-            size: 16,
-            color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
           ),
         ],
       ),
